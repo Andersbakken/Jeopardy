@@ -9,6 +9,7 @@ class GraphicsView : public QGraphicsView
 public:
     GraphicsView(QGraphicsScene *scene, QWidget *parent = 0);
     void resizeEvent(QResizeEvent *);
+    QSize sizeHint() const;
 };
 
 #endif

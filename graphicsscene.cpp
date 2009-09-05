@@ -52,9 +52,79 @@ void TopicItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
 FrameItem::FrameItem(int value)
 {
     setCacheMode(ItemCoordinateCache);
+    d.animationGroup = 0;
+    d.geometryAnimation = 0;
     d.value = value;
+    d.yRotation = 0;
 }
 
+void FrameItem::setYRotation(qreal yRotation)
+{
+    d.yRotation = yRotation;
+    QTransform transform;
+    transform.rotate(yRotation, Qt::YAxis);
+    setTransform(transform);
+}
+
+qreal FrameItem::yRotation() const
+{
+    return d.yRotation;
+}
+
+
+void FrameItem::raise()
+{
+    if (d.animationGroup)
+        return;
+    d.animationGroup = new QParallelAnimationGroup;
+    d.geometryAnimation = new QPropertyAnimation;
+    d.geometryAnimation->setDuration(1000);
+    d.geometryAnimation->setTargetObject(this);
+    d.geometryAnimation->setPropertyName("geometry");
+    QRectF r = scene()->sceneRect();
+    static qreal adjust = .1;
+    d.geometryAnimation->setEndValue(r.adjusted(r.width() * adjust, r.height() * adjust,
+                                                -r.width() * adjust, -r.height() * adjust));
+    d.rotationAnimation = new QPropertyAnimation;
+    d.rotationAnimation->setDuration(1000);
+    d.rotationAnimation->setTargetObject(this);
+    d.rotationAnimation->setPropertyName("yRotation");
+    d.rotationAnimation->setEndValue(360);
+
+    setProperty("originalGeometry", geometry());
+    d.animationGroup->addAnimation(d.geometryAnimation);
+    d.animationGroup->addAnimation(d.rotationAnimation);
+    d.animationGroup->start();
+    setZValue(10);
+}
+
+void FrameItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
+{
+    if (d.animationGroup && d.animationGroup->state() == QAbstractAnimation::Stopped) {
+        lower();
+    } else {
+        raise();
+    }
+}
+
+
+void FrameItem::lower()
+{
+    Q_ASSERT(d.animationGroup);
+    d.geometryAnimation->setEndValue(property("originalGeometry"));
+    d.rotationAnimation->setEndValue(0);
+    connect(d.animationGroup, SIGNAL(finished()), this, SLOT(onLowered()));
+    setProperty("originalGeometry", QVariant());
+    d.animationGroup->start();
+}
+
+void FrameItem::onLowered()
+{
+    setZValue(0);
+    delete d.animationGroup;
+    d.animationGroup = 0;
+    d.geometryAnimation = 0;
+}
 
 void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
 {
