@@ -470,18 +470,19 @@ void GraphicsScene::click(FrameItem *frame)
     d.normalState->assignProperty(frame, "zValue", 0);
     d.normalState->assignProperty(frame, "yRotation", 0.0);
 
+    d.raisedState->assignProperty(frame, "geometry", ::raisedGeometry(sceneRect()));
+    d.raisedState->assignProperty(frame, "zValue", 1.0);
+    d.raisedState->assignProperty(frame, "yRotation", 360.0);
+
     QParallelAnimationGroup *group = new QParallelAnimationGroup(d.normalState);
     group->addAnimation(new QPropertyAnimation(frame, "geometry"));
     group->addAnimation(new QPropertyAnimation(frame, "zValue"));
     group->addAnimation(new QPropertyAnimation(frame, "yRotation"));
 
-    // ### addTransition stuff
+//    QAbstractTransition *transition =
 
+        // ### addTransition stuff
 
-
-    d.raisedState->assignProperty(frame, "geometry", ::raisedGeometry(sceneRect()));
-    d.raisedState->assignProperty(frame, "zValue", 1.0);
-    d.raisedState->assignProperty(frame, "yRotation", 360.0);
 }
 
 void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
