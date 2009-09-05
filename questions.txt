@@ -1,0 +1,27 @@
+America
+What building does the President live in?|White House
+What is the name of the current president?|Barack Obama
+How many stripes are there on the flag?|13
+What is the largest state?|Alaska
+When is America's birthday?|July 4
+
+America (II)
+What is the capital of America?|Washington
+What is the longest river in America?|Mississippi
+Where does the name America come from?|Amerigo Vespucci
+What country is north of America?|Canada
+What does USA stand for?|United States of America
+
+Japan
+What is Japan's country's song?|Kimigayo
+What is the biggest lake in Japan?|Lake Biwa / Biwa-ko
+Who is on 5000 yen?|Nitobe Inazo (up to 2004) / Ichiyo Higuchi (from late 2004)
+When did the Kamakura Bakufu start?|1192
+What is Japan's country's bird?|kiji - on 10,000 yen bill
+
+Sports
+How many members are on a soccer team?|11
+What is Hideo Nomo's uniform number?|16
+In tennis, what is the name of 0 points?|love
+Name 4 sports that don't use balls.
+Where were the 1984 Olympics?|Los Angeles
