@@ -30,6 +30,13 @@ private:
     } d;
 };
 
+class SelectorItem : public QGraphicsWidget
+{
+public:
+    SelectorItem();
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = 0);
+};
+
 class GraphicsScene : public QGraphicsScene
 {
     Q_OBJECT
@@ -38,6 +45,7 @@ public:
     bool load(QIODevice *device);
     bool load(const QString &file) { QFile f(file); return f.open(QIODevice::ReadOnly) && load(&f); }
     void reset();
+    void keyPressEvent(QKeyEvent *e);
 public slots:
     void onSceneRectChanged(const QRectF &rect);
 private:
@@ -45,6 +53,7 @@ private:
         QList<TopicItem*> topicItems;
         QList<QList<FrameItem*> > frameItems;
         QGraphicsGridLayout *layout;
+
     } d;
 };
 

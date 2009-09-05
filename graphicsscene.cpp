@@ -79,6 +79,29 @@ void FrameItem::setQuestion(const QString &question)
     d.question = question;
 }
 
+SelectorItem::SelectorItem()
+{
+    setCacheMode(ItemCoordinateCache);
+}
+
+void SelectorItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
+{
+    QLinearGradient gradient(0, 0, 0, option->rect.height());
+    gradient.setColorAt(0.0, QColor(0, 20, 200, 70));
+    gradient.setColorAt(0.5, QColor(0, 40, 250, 260));
+    gradient.setColorAt(1.0, QColor(0, 20, 200, 70));
+
+    enum { PenWidth = 5 };
+    QLinearGradient penGradient(0, 0, option->rect.width(), 0);
+    gradient.setColorAt(0.0, QColor(0, 200, 20, 70));
+    gradient.setColorAt(0.5, QColor(0, 250, 40, 260));
+    gradient.setColorAt(1.0, QColor(0, 200, 20, 70));
+    painter->setPen(QPen(penGradient, PenWidth));
+    painter->setBrush(gradient);
+
+    painter->drawRoundedRect(option->rect.adjusted(PenWidth / 2, PenWidth / 2, -PenWidth / 2, -PenWidth / 2), PenWidth, PenWidth);
+}
+
 GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
@@ -159,5 +182,8 @@ void GraphicsScene::reset()
     clear();
     d.topicItems.clear();
     d.frameItems.clear();
+}
+void GraphicsScene::keyPressEvent(QKeyEvent *e)
+{
 
 }
