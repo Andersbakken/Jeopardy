@@ -34,18 +34,23 @@ public:
     void setYRotation(qreal yy);
     enum State { Raising, Raised, Lowering, Lowered };
     State state() const;
+    void timerEvent(QTimerEvent *e);
 public slots:
     void onLowered();
+    void onQuestionShown();
 signals:
     void raised();
     void lowered();
 private:
     struct Data {
+        QBasicTimer answerTimer;
+        QTime timer;
 	State state;
         int value;
         qreal yRotation;
         QString question, answer;
-        QParallelAnimationGroup *animationGroup;
+        QParallelAnimationGroup *parallelAnimationGroup;
+        QSequentialAnimationGroup *animationGroup;
         QPropertyAnimation *geometryAnimation, *rotationAnimation;
         QVariantAnimation *textAnimation;
         int row, column;

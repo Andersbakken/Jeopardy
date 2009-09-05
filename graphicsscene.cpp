@@ -1,5 +1,7 @@
 #include "graphicsscene.h"
 
+enum { TimeOut = 7000 };
+
 static inline QRectF itemGeometry(int row, int column, int rows, int columns, const QRectF &sceneRect)
 {
     if (qMin(rows, columns) <= 0)
@@ -133,6 +135,19 @@ FrameItem::FrameItem(int row, int col, int value)
     d.state = Lowered;
 }
 
+void FrameItem::timerEvent(QTimerEvent *e)
+{
+    if (e->timerId() == d.answerTimer.timerId()) {
+        if (d.timer.elapsed() >= TimeOut) {
+
+        }
+        update();
+    } else {
+        QGraphicsWidget::timerEvent(e);
+    }
+}
+
+
 FrameItem::State FrameItem::state() const
 {
     if (d.animationGroup && d.animationGroup->state() == QAbstractAnimation::Stopped) {
@@ -159,9 +174,11 @@ void FrameItem::raise()
 {
     if (d.animationGroup)
         return;
+
     d.state = Raising;
     enum { Duration = 1000 };
-    d.animationGroup = new QParallelAnimationGroup;
+    d.parallelAnimationGroup = new QParallelAnimationGroup;
+    d.animationGroup = new QSequentialAnimationGroup;
     d.geometryAnimation = new QPropertyAnimation;
     d.geometryAnimation->setDuration(Duration);
     d.geometryAnimation->setTargetObject(this);
@@ -179,11 +196,13 @@ void FrameItem::raise()
     d.textAnimation->setEndValue(d.question);
     d.textAnimation->setDuration(Duration);
 
-    d.animationGroup->addAnimation(d.geometryAnimation);
+    d.parallelAnimationGroup->addAnimation(d.geometryAnimation);
+    d.parallelAnimationGroup->addAnimation(d.textAnimation);
+    d.animationGroup->addAnimation(d.parallelAnimationGroup);
     d.animationGroup->addAnimation(d.textAnimation);
-    d.animationGroup->addAnimation(d.rotationAnimation);
     d.animationGroup->start();
     connect(d.animationGroup, SIGNAL(finished()), this, SIGNAL(raised()));
+    connect(d.parallelAnimationGroup, SIGNAL(finished()), this, SLOT(onQuestionShown()));
     setZValue(10);
 }
 
@@ -200,7 +219,6 @@ void FrameItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 void FrameItem::lower()
 {
     Q_ASSERT(d.animationGroup);
-    qDebug() << static_cast<GraphicsScene*>(scene())->itemGeometry(this) << d.row << d.column;
     d.geometryAnimation->setEndValue(static_cast<GraphicsScene*>(scene())->itemGeometry(this));
     d.rotationAnimation->setEndValue(0);
     delete d.textAnimation;
@@ -213,37 +231,55 @@ void FrameItem::lower()
 void FrameItem::onLowered()
 {
     setZValue(0);
-    delete d.animationGroup;
-    d.animationGroup = 0;
     d.geometryAnimation = 0;
     d.rotationAnimation = 0;
     d.textAnimation = 0;
     d.state = Lowered;
+    d.animationGroup->deleteLater();
+    d.animationGroup = 0;
     emit lowered();
 }
 
+void FrameItem::onQuestionShown()
+{
+    d.timer.restart();
+    d.answerTimer.start(50, this);
+}
+
+
 void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
 {
-    QFont f;
-    f.setPixelSize(option->rect.height() / 3);
-    painter->setFont(f);
     const QBrush brush = QColor(0x3366ff);
     qDrawShadePanel(painter, option->rect, palette(), false, 5, &brush);
     painter->setPen(Qt::white);
     QString t;
-    if (!d.textAnimation) {
-        t = QString::number(d.value);
-    } else if (d.textAnimation->state() == QAbstractAnimation::Running) {
-        t = d.textAnimation->currentValue().toString();
-    } else {
-        t = d.question;
-    }
     enum { Margin = 6 } ;
-    const QRectF r = option->rect.adjusted(Margin, Margin, -Margin, -Margin);
+    QRectF r = option->rect.adjusted(Margin, Margin, -Margin, -Margin);
+    switch (state()) {
+    case Raising:
+        if (d.textAnimation->state() == QAbstractAnimation::Running) {
+            t = d.textAnimation->currentValue().toString();
+            break;
+        }
+        // fallthrough
+    case Lowered:
+        t = QString::number(d.value);
+        break;
+    case Raised:
+        r = r.adjusted(0, 0, 0, -painter->fontMetrics().height() + 2);
+        // fallthrough
+    case Lowering:
+        t = d.question;
+        break;
+    }
     QTextLayout layout(t);
     ::initTextLayout(&layout, r);
     painter->setPen(Qt::white);
     layout.draw(painter, QPointF());
+    if (state() == Raised) {
+        int msecsLeft = TimeOut - d.timer.elapsed();
+        painter->drawText(option->rect, Qt::AlignBottom|Qt::AlignHCenter, QString::number(msecsLeft / 1000.0));
+    }
 }
 
 
@@ -415,8 +451,9 @@ void GraphicsScene::keyPressEvent(QKeyEvent *e)
 
 QRectF GraphicsScene::itemGeometry(FrameItem *item) const
 {
-    return ::itemGeometry(item->d.row + 1, item->d.column,
-                          d.topicItems.size(), d.frameItems.value(0).size(),
+    return ::itemGeometry(item->d.row, item->d.column,
+                          d.frameItems.value(0).size() + 1,
+                          d.topicItems.size(),
                           sceneRect());
 }
 
