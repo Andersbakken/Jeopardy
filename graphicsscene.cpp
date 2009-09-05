@@ -1,5 +1,84 @@
 #include "graphicsscene.h"
 
+static inline QRectF itemGeometry(int row, int column, int rows, int columns, const QRectF &sceneRect)
+{
+    if (qMin(rows, columns) <= 0)
+        return QRectF();
+    QRectF r(0, 0, sceneRect.width() / columns, sceneRect.height() / rows);
+    r.moveLeft(r.width() * column);
+    r.moveTop(r.height() * row);
+    return r;
+}
+
+static inline QRectF raisedGeometry(const QRectF &sceneRect)
+{
+    static qreal adjust = .1;
+    return sceneRect.adjusted(sceneRect.width() * adjust, sceneRect.height() * adjust,
+                              -sceneRect.width() * adjust, -sceneRect.height() * adjust);
+}
+
+static inline void initTextLayout(QTextLayout *layout, const QRectF &rect)
+{
+    layout->setCacheEnabled(true);
+    int pixelSize = rect.height() / 3;
+    forever {
+        layout->clearLayout();
+        QFont f;
+        f.setPixelSize(pixelSize--);
+        layout->setFont(f);
+        layout->beginLayout();
+        const int h = QFontMetrics(f).height();
+        QPointF pos(rect.topLeft());
+        forever {
+            QTextLine line = layout->createLine();
+            if (!line.isValid())
+                break;
+            line.setLineWidth(rect.width());
+            line.setPosition(pos);
+            pos += QPointF(0, h);
+        }
+        layout->endLayout();
+        const QRectF textRect = layout->boundingRect();
+        if (pixelSize <= 8 || rect.size().expandedTo(textRect.size()) == rect.size()) {
+            break;
+        }
+    }
+}
+
+
+class TextAnimation : public QVariantAnimation
+{
+public:
+    TextAnimation(QGraphicsWidget *w)
+        : widget(w)
+    {}
+    virtual void updateCurrentValue(const QVariant &)
+    {
+        widget->update();
+    }
+    virtual QVariant interpolated(const QVariant &from, const QVariant &to, qreal progress) const
+    {
+        if (qFuzzyIsNull(progress)) {
+            return from;
+        } else if (qFuzzyCompare(progress, 1.0)) {
+            return to;
+        }
+
+        if (progress < .5) {
+            QString fromString = from.toString();
+            const int letters = fromString.size() * (progress * 2);
+            fromString.chop(letters);
+            return fromString;
+        } else {
+            const QString toString = to.toString();
+            const int letters = toString.size() * ((progress - 0.5) * 2);
+            return toString.mid(letters);
+        }
+    }
+private:
+    QGraphicsWidget *widget;
+};
+
 TopicItem::TopicItem(const QString &string)
 {
     d.text = string;
@@ -21,41 +100,27 @@ void TopicItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
     const QBrush brush = QColor(0x3366ff);
     qDrawShadePanel(painter, option->rect, palette(), false, Margin / 2, &brush);
     const QRectF r = option->rect.adjusted(Margin, Margin, -Margin, -Margin);
-    int pixelSize = option->rect.height() / 3;
+    QTextLayout layout(d.text);
+    ::initTextLayout(&layout, r);
     painter->setPen(Qt::white);
-    forever {
-        QFont f;
-        f.setPixelSize(pixelSize--);
-        QTextLayout layout(d.text, f);
-        layout.setCacheEnabled(true);
-        layout.beginLayout();
-        const int h = QFontMetrics(f).height();
-        QPointF pos(r.topLeft());
-        forever {
-            QTextLine line = layout.createLine();
-            if (!line.isValid())
-                break;
-            line.setLineWidth(r.width());
-            line.setPosition(pos);
-            pos += QPointF(0, h);
-        }
-        layout.endLayout();
-        QRectF textRect = layout.boundingRect();
-        if (pixelSize <= 8 || r.size().expandedTo(textRect.size()) == r.size()) {
-            layout.draw(painter, QPointF());
-            // ### center text?
-            break;
-        }
-    }
+    layout.draw(painter, QPointF());
 }
 
-FrameItem::FrameItem(int value)
+FrameItem::FrameItem(int row, int col, int value)
 {
     setCacheMode(ItemCoordinateCache);
     d.animationGroup = 0;
     d.geometryAnimation = 0;
     d.value = value;
     d.yRotation = 0;
+    d.textAnimation = 0;
+    d.row = row;
+    d.column = col;
+}
+
+bool FrameItem::isAnimating() const
+{
+    return (d.animationGroup && d.animationGroup->state() == QAbstractAnimation::Running);
 }
 
 void FrameItem::setYRotation(qreal yRotation)
@@ -71,30 +136,34 @@ qreal FrameItem::yRotation() const
     return d.yRotation;
 }
 
-
 void FrameItem::raise()
 {
     if (d.animationGroup)
         return;
+    enum { Duration = 1000 };
     d.animationGroup = new QParallelAnimationGroup;
     d.geometryAnimation = new QPropertyAnimation;
-    d.geometryAnimation->setDuration(1000);
+    d.geometryAnimation->setDuration(Duration);
     d.geometryAnimation->setTargetObject(this);
     d.geometryAnimation->setPropertyName("geometry");
-    QRectF r = scene()->sceneRect();
-    static qreal adjust = .1;
-    d.geometryAnimation->setEndValue(r.adjusted(r.width() * adjust, r.height() * adjust,
-                                                -r.width() * adjust, -r.height() * adjust));
+
+    d.geometryAnimation->setEndValue(::raisedGeometry(scene()->sceneRect()));
     d.rotationAnimation = new QPropertyAnimation;
-    d.rotationAnimation->setDuration(1000);
+    d.rotationAnimation->setDuration(Duration);
     d.rotationAnimation->setTargetObject(this);
     d.rotationAnimation->setPropertyName("yRotation");
     d.rotationAnimation->setEndValue(360);
 
-    setProperty("originalGeometry", geometry());
-    d.animationGroup->addAnimation(d.geometryAnimation);
-    d.animationGroup->addAnimation(d.rotationAnimation);
+    d.textAnimation = new TextAnimation(this);
+    d.textAnimation->setStartValue(QString::number(d.value));
+    d.textAnimation->setEndValue(d.question);
+    d.textAnimation->setDuration(Duration);
+
+//    d.animationGroup->addAnimation(d.geometryAnimation);
+    d.animationGroup->addAnimation(d.textAnimation);
+//    d.animationGroup->addAnimation(d.rotationAnimation);
     d.animationGroup->start();
+    connect(d.animationGroup, SIGNAL(finished()), this, SIGNAL(raised()));
     setZValue(10);
 }
 
@@ -111,7 +180,7 @@ void FrameItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 void FrameItem::lower()
 {
     Q_ASSERT(d.animationGroup);
-    d.geometryAnimation->setEndValue(property("originalGeometry"));
+    d.geometryAnimation->setEndValue(static_cast<GraphicsScene*>(scene())->itemGeometry(this));
     d.rotationAnimation->setEndValue(0);
     connect(d.animationGroup, SIGNAL(finished()), this, SLOT(onLowered()));
     setProperty("originalGeometry", QVariant());
@@ -124,6 +193,7 @@ void FrameItem::onLowered()
     delete d.animationGroup;
     d.animationGroup = 0;
     d.geometryAnimation = 0;
+    emit lowered();
 }
 
 void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
@@ -134,8 +204,20 @@ void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
     const QBrush brush = QColor(0x3366ff);
     qDrawShadePanel(painter, option->rect, palette(), false, 5, &brush);
     painter->setPen(Qt::white);
-    painter->drawText(option->rect, Qt::AlignCenter, QString::number(d.value));
-    // ### multi line breaking?
+    QString t;
+    if (!d.textAnimation) {
+        t = QString::number(d.value);
+    } else if (d.textAnimation->state() == QAbstractAnimation::Running) {
+        t = d.textAnimation->currentValue().toString();
+    } else {
+        t = d.question;
+    }
+    enum { Margin = 6 } ;
+    const QRectF r = option->rect.adjusted(Margin, Margin, -Margin, -Margin);
+    QTextLayout layout(t);
+    ::initTextLayout(&layout, r);
+    painter->setPen(Qt::white);
+    layout.draw(painter, QPointF());
 }
 
 
@@ -148,6 +230,17 @@ void FrameItem::setQuestion(const QString &question)
 {
     d.question = question;
 }
+
+QString FrameItem::answer() const
+{
+    return d.answer;
+}
+
+void FrameItem::setAnswer(const QString &answer)
+{
+    d.answer = answer;
+}
+
 
 SelectorItem::SelectorItem()
 {
@@ -175,22 +268,20 @@ void SelectorItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opti
 GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
-    d.layout = 0;
-    connect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(onSceneRectChanged(QRectF)));
+    d.raised = 0;
+    d.sceneRectChangedBlocked = false;
 }
 
 bool GraphicsScene::load(QIODevice *device)
 {
     reset();
+    disconnect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(onSceneRectChanged(QRectF)));
     QTextStream ts(device);
     enum State {
         ExpectingTopic,
         ExpectingQuestion
     } state = ExpectingTopic;
 
-    d.layout = new QGraphicsGridLayout;
-    d.layout->setHorizontalSpacing(0);
-    d.layout->setVerticalSpacing(0);
 
     TopicItem *topic = 0;
     int lineNumber = 0;
@@ -205,10 +296,8 @@ bool GraphicsScene::load(QIODevice *device)
             if (line.isEmpty())
                 continue;
             topic = new TopicItem(line);
-            qDebug() << "creating topic" << line;
             addItem(topic);
             d.frameItems.append(QList<FrameItem*>());
-            d.layout->addItem(topic, 0, d.topicItems.size());
             d.topicItems.append(topic);
             state = ExpectingQuestion;
             break;
@@ -226,34 +315,78 @@ bool GraphicsScene::load(QIODevice *device)
                     reset();
                     return false;
                 }
-                const int c = d.frameItems.last().size();
-                FrameItem *frame = new FrameItem(((c + 1) * 100));
+                const int count = d.frameItems.last().size();
+                const int row = count + 1;
+                const int col = d.topicItems.size() - 1;
+                FrameItem *frame = new FrameItem(row, col, ((row) * 100));
+                frame->setQuestion(split.value(0));
+                frame->setAnswer(split.value(1));
+                connect(frame, SIGNAL(raised()), this, SLOT(onFrameRaised()));
+                connect(frame, SIGNAL(lowered()), this, SLOT(onFrameLowered()));
                 addItem(frame);
-                d.layout->addItem(frame, c + 1, d.topicItems.size() - 1);
                 d.frameItems.last().append(frame);
-                if (c == 4)
+                if (count == 4)
                     state = ExpectingTopic;
             }
             break;
         }
     }
+    onSceneRectChanged(sceneRect());
+    connect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(onSceneRectChanged(QRectF)));
     return true;
 }
 
 void GraphicsScene::onSceneRectChanged(const QRectF &rect)
 {
-    d.layout->setGeometry(rect);
-    qDebug() << rect;
+    if (d.sceneRectChangedBlocked || rect.isEmpty())
+        return;
+    d.sceneRectChangedBlocked = true;
+    const int cols = d.topicItems.size();
+    const int rows = d.frameItems.value(0).size();
+    for (int x=0; x<cols; ++x) {
+        const QRectF r = ::itemGeometry(0, x, rows + 1, cols, rect);
+        d.topicItems.at(x)->setGeometry(r);
+        const QList<FrameItem*> &frames = d.frameItems.at(x);
+        for (int y=0; y<rows; ++y) {
+            FrameItem *frame = frames.at(y);
+            if (frame == d.raised) {
+                frame->setGeometry(::raisedGeometry(rect));
+            } else if (!frame->isAnimating()) {
+                frame->setGeometry(::itemGeometry(1 + y, x, rows + 1, cols, rect));
+            } else {
+                frame->d.geometryAnimation->setEndValue(::raisedGeometry(rect));
+            }
+        }
+    }
+    d.sceneRectChangedBlocked = false;
 }
+
 void GraphicsScene::reset()
 {
-    delete d.layout;
-    d.layout = 0;
     clear();
     d.topicItems.clear();
     d.frameItems.clear();
 }
+
 void GraphicsScene::keyPressEvent(QKeyEvent *e)
 {
 
+}
+
+QRectF GraphicsScene::itemGeometry(FrameItem *item) const
+{
+    return ::itemGeometry(item->d.row + 1, item->d.column,
+                          d.topicItems.size(), d.frameItems.value(0).size(),
+                          sceneRect());
+}
+
+void GraphicsScene::onFrameRaised()
+{
+    d.raised = qobject_cast<FrameItem*>(sender());
+}
+
+void GraphicsScene::onFrameLowered()
+{
+    if (d.raised == qobject_cast<FrameItem*>(sender()))
+        d.raised = 0;
 }
