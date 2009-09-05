@@ -122,17 +122,28 @@ void TopicItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
     layout.draw(painter, QPointF());
 }
 
-FrameItem::FrameItem(int row, int col, int value)
+FrameItem::FrameItem(int row, int column)
 {
-    setCacheMode(ItemCoordinateCache);
-    d.animationGroup = 0;
-    d.geometryAnimation = 0;
-    d.value = value;
-    d.yRotation = 0;
-    d.textAnimation = 0;
     d.row = row;
-    d.column = col;
-    d.state = Lowered;
+    d.column = column;
+    setCacheMode(ItemCoordinateCache);
+    d.value = 0;
+}
+
+void FrameItem::setValue(int value)
+{
+    d.value = value;
+    d.valueString = d.text = QString("%1$").arg(value);
+}
+
+int FrameItem::value() const
+{
+    return d.value;
+}
+
+QString FrameItem::valueString() const
+{
+    return d.valueString;
 }
 
 void FrameItem::timerEvent(QTimerEvent *e)
@@ -147,14 +158,15 @@ void FrameItem::timerEvent(QTimerEvent *e)
     }
 }
 
-
-FrameItem::State FrameItem::state() const
+void FrameItem::setText(const QString &text)
 {
-    if (d.animationGroup && d.animationGroup->state() == QAbstractAnimation::Stopped) {
-        return Raised;
-    } else {
-        return d.state;
-    }
+    d.text = text;
+    update();
+}
+
+QString FrameItem::text() const
+{
+    return d.text;
 }
 
 void FrameItem::setYRotation(qreal yRotation)
@@ -169,12 +181,9 @@ qreal FrameItem::yRotation() const
 {
     return d.yRotation;
 }
-
+#if 0
 void FrameItem::raise()
 {
-    if (d.animationGroup)
-        return;
-
     d.state = Raising;
     enum { Duration = 1000 };
     d.parallelAnimationGroup = new QParallelAnimationGroup;
@@ -245,7 +254,7 @@ void FrameItem::onQuestionShown()
     d.timer.restart();
     d.answerTimer.start(50, this);
 }
-
+#endif
 
 void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
 {
@@ -254,32 +263,11 @@ void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
     painter->setPen(Qt::white);
     QString t;
     enum { Margin = 6 } ;
-    QRectF r = option->rect.adjusted(Margin, Margin, -Margin, -Margin);
-    switch (state()) {
-    case Raising:
-        if (d.textAnimation->state() == QAbstractAnimation::Running) {
-            t = d.textAnimation->currentValue().toString();
-            break;
-        }
-        // fallthrough
-    case Lowered:
-        t = QString::number(d.value);
-        break;
-    case Raised:
-        r = r.adjusted(0, 0, 0, -painter->fontMetrics().height() + 2);
-        // fallthrough
-    case Lowering:
-        t = d.question;
-        break;
-    }
-    QTextLayout layout(t);
+    const QRectF r = option->rect.adjusted(Margin, Margin, -Margin, -Margin);
+    QTextLayout layout(d.text);
     ::initTextLayout(&layout, r);
     painter->setPen(Qt::white);
     layout.draw(painter, QPointF());
-    if (state() == Raised) {
-        int msecsLeft = TimeOut - d.timer.elapsed();
-        painter->drawText(option->rect, Qt::AlignBottom|Qt::AlignHCenter, QString::number(msecsLeft / 1000.0));
-    }
 }
 
 
@@ -330,6 +318,7 @@ void SelectorItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opti
 GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
+    d.normalState = d.raisedState = d.showQuestionState = d.showAnswerState = d.correctAnswerState = d.wrongAnswerState = 0;
     d.raised = 0;
     d.sceneRectChangedBlocked = false;
 }
@@ -380,11 +369,14 @@ bool GraphicsScene::load(QIODevice *device)
                 const int count = d.frameItems.last().size();
                 const int row = count + 1;
                 const int col = d.topicItems.size() - 1;
-                FrameItem *frame = new FrameItem(row, col, ((row) * 100));
+                FrameItem *frame = new FrameItem(row, col);
+                frame->setValue((row) * 100);
                 frame->setQuestion(split.value(0));
                 frame->setAnswer(split.value(1));
-                connect(frame, SIGNAL(raised()), this, SLOT(onFrameRaised()));
-                connect(frame, SIGNAL(lowered()), this, SLOT(onFrameLowered()));
+                frame->setText(frame->valueString());
+
+//                 connect(frame, SIGNAL(raised()), this, SLOT(onFrameRaised()));
+//                 connect(frame, SIGNAL(lowered()), this, SLOT(onFrameLowered()));
                 addItem(frame);
                 d.frameItems.last().append(frame);
                 if (count == 4)
@@ -412,26 +404,26 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rect)
         for (int y=0; y<rows; ++y) {
             FrameItem *frame = frames.at(y);
             QRectF r;
-            switch (frame->state()) {
-            case FrameItem::Lowered:
-            case FrameItem::Lowering:
-                r = ::itemGeometry(1 + y, x, rows + 1, cols, rect);
-                if (frame->state() == FrameItem::Lowered) {
-                    frame->setGeometry(r);
-                } else {
-                    frame->d.geometryAnimation->setEndValue(r);
-                }
-                break;
-            case FrameItem::Raised:
-            case FrameItem::Raising:
-                r = ::raisedGeometry(rect);
-                if (frame->state() == FrameItem::Raised) {
-                    frame->setGeometry(r);
-                } else {
-                    frame->d.geometryAnimation->setEndValue(r);
-                }
-                break;
-            }
+//             switch (frame->state()) {
+//             case FrameItem::Lowered:
+//             case FrameItem::Lowering:
+            r = ::itemGeometry(1 + y, x, rows + 1, cols, rect);
+//                if (frame->state() == FrameItem::Lowered) {
+            frame->setGeometry(r);
+//                 } else {
+//                     frame->d.geometryAnimation->setEndValue(r);
+//                 }
+//                 break;
+//             case FrameItem::Raised:
+//             case FrameItem::Raising:
+//                 r = ::raisedGeometry(rect);
+//                 if (frame->state() == FrameItem::Raised) {
+//                     frame->setGeometry(r);
+//                 } else {
+//                     frame->d.geometryAnimation->setEndValue(r);
+//                 }
+//                 break;
+//             }
         }
     }
     d.sceneRectChangedBlocked = false;
@@ -466,4 +458,36 @@ void GraphicsScene::onFrameLowered()
 {
     if (d.raised == qobject_cast<FrameItem*>(sender()))
         d.raised = 0;
+}
+
+void GraphicsScene::click(FrameItem *frame)
+{
+    Q_ASSERT(frame);
+    if (d.normalState)
+        return;
+    d.normalState = new QState(&d.stateMachine);
+    d.normalState->assignProperty(frame, "geometry", itemGeometry(frame));
+    d.normalState->assignProperty(frame, "zValue", 0);
+    d.normalState->assignProperty(frame, "yRotation", 0.0);
+
+    QParallelAnimationGroup *group = new QParallelAnimationGroup(d.normalState);
+    group->addAnimation(new QPropertyAnimation(frame, "geometry"));
+    group->addAnimation(new QPropertyAnimation(frame, "zValue"));
+    group->addAnimation(new QPropertyAnimation(frame, "yRotation"));
+
+    // ### addTransition stuff
+
+
+
+    d.raisedState->assignProperty(frame, "geometry", ::raisedGeometry(sceneRect()));
+    d.raisedState->assignProperty(frame, "zValue", 1.0);
+    d.raisedState->assignProperty(frame, "yRotation", 360.0);
+}
+
+void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
+{
+    FrameItem *frame = qgraphicsitem_cast<FrameItem*>(itemAt(event->scenePos()));
+    if (frame) {
+        click(frame);
+    }
 }
