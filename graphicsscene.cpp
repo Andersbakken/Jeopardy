@@ -82,36 +82,82 @@ void FrameItem::setQuestion(const QString &question)
 GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
+    d.layout = 0;
     connect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(onSceneRectChanged(QRectF)));
-    static const char *topics[] = { "Ancient greece", "Formulas", "Things that happen", "What?", "Nah", 0 };
-    static const int values[] = { 100, 200, 300, 400, 500, -1 };
-    d.layout = new QGraphicsGridLayout;
-    d.layout->setHorizontalSpacing(0);
-    d.layout->setVerticalSpacing(0);
-    for (int i=0; topics[i]; ++i) {
-        d.topicItems.append(new TopicItem(topics[i]));
-        addItem(d.topicItems.at(i));
-        d.layout->addItem(d.topicItems[i], 0, i);
-        QList<FrameItem*> frames;
-        for (int j=0; values[j] != -1; ++j) {
-            frames.append(new FrameItem(values[j]));
-            addItem(frames.at(j));
-            d.layout->addItem(frames.at(j), j + 1, i);
-        }
-        d.frameItems.append(frames);
-
-    }
 }
 
 bool GraphicsScene::load(QIODevice *device)
 {
-    clear();
-    d.topicItems.clear();
-    d.frameItems.clear();
+    reset();
+    QTextStream ts(device);
+    enum State {
+        ExpectingTopic,
+        ExpectingQuestion
+    } state = ExpectingTopic;
+
+    d.layout = new QGraphicsGridLayout;
+    d.layout->setHorizontalSpacing(0);
+    d.layout->setVerticalSpacing(0);
+
+    TopicItem *topic = 0;
+    int lineNumber = 0;
+    QRegExp commentRegexp("^ *#");
+    while (!ts.atEnd()) {
+        ++lineNumber;
+        const QString line = ts.readLine();
+        if (line.indexOf(commentRegexp) == 0)
+            continue;
+        switch (state) {
+        case ExpectingTopic:
+            if (line.isEmpty())
+                continue;
+            topic = new TopicItem(line);
+            qDebug() << "creating topic" << line;
+            addItem(topic);
+            d.frameItems.append(QList<FrameItem*>());
+            d.layout->addItem(topic, 0, d.topicItems.size());
+            d.topicItems.append(topic);
+            state = ExpectingQuestion;
+            break;
+        case ExpectingQuestion:
+            if (line.isEmpty()) {
+                qWarning() << "Didn't expect an empty line here. I was looking for question number"
+                           << (d.frameItems.last().size() + 1) << "for" << topic->text() << "on line" << lineNumber;
+                reset();
+                return false;
+            } else {
+                const QStringList split = line.split('|');
+                if (split.size() > 2) {
+                    qWarning("I don't understand this line. There can only be one | per question line (%s) line: %d",
+                             qPrintable(line), lineNumber);
+                    reset();
+                    return false;
+                }
+                const int c = d.frameItems.last().size();
+                FrameItem *frame = new FrameItem(((c + 1) * 100));
+                addItem(frame);
+                d.layout->addItem(frame, c + 1, d.topicItems.size() - 1);
+                d.frameItems.last().append(frame);
+                if (c == 4)
+                    state = ExpectingTopic;
+            }
+            break;
+        }
+    }
+    return true;
 }
 
 void GraphicsScene::onSceneRectChanged(const QRectF &rect)
 {
     d.layout->setGeometry(rect);
     qDebug() << rect;
+}
+void GraphicsScene::reset()
+{
+    delete d.layout;
+    d.layout = 0;
+    clear();
+    d.topicItems.clear();
+    d.frameItems.clear();
+
 }

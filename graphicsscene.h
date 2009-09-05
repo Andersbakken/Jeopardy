@@ -37,6 +37,7 @@ public:
     GraphicsScene(QObject *parent = 0);
     bool load(QIODevice *device);
     bool load(const QString &file) { QFile f(file); return f.open(QIODevice::ReadOnly) && load(&f); }
+    void reset();
 public slots:
     void onSceneRectChanged(const QRectF &rect);
 private:
