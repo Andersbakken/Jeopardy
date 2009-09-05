@@ -64,6 +64,7 @@ public:
             return to;
         }
 
+#if 0
         if (progress < .5) {
             QString fromString = from.toString();
             const int letters = fromString.size() * (progress * 2);
@@ -74,6 +75,19 @@ public:
             const int letters = toString.size() * ((progress - 0.5) * 2);
             return toString.mid(letters);
         }
+#else
+        QString fromString = from.toString();
+        const QString toString = to.toString();
+        const int letters = fromString.size() + toString.size();
+        const int current = letters * progress;
+        if (current == fromString.size()) {
+            return QString();
+        } else if (current < fromString.size()) {
+            fromString.chop(current);
+            return fromString;
+        }
+        return toString.mid(toString.size() - (current - fromString.size()));
+#endif
     }
 private:
     QGraphicsWidget *widget;
@@ -116,11 +130,16 @@ FrameItem::FrameItem(int row, int col, int value)
     d.textAnimation = 0;
     d.row = row;
     d.column = col;
+    d.state = Lowered;
 }
 
-bool FrameItem::isAnimating() const
+FrameItem::State FrameItem::state() const
 {
-    return (d.animationGroup && d.animationGroup->state() == QAbstractAnimation::Running);
+    if (d.animationGroup && d.animationGroup->state() == QAbstractAnimation::Stopped) {
+        return Raised;
+    } else {
+        return d.state;
+    }
 }
 
 void FrameItem::setYRotation(qreal yRotation)
@@ -140,6 +159,7 @@ void FrameItem::raise()
 {
     if (d.animationGroup)
         return;
+    d.state = Raising;
     enum { Duration = 1000 };
     d.animationGroup = new QParallelAnimationGroup;
     d.geometryAnimation = new QPropertyAnimation;
@@ -159,9 +179,9 @@ void FrameItem::raise()
     d.textAnimation->setEndValue(d.question);
     d.textAnimation->setDuration(Duration);
 
-//    d.animationGroup->addAnimation(d.geometryAnimation);
+    d.animationGroup->addAnimation(d.geometryAnimation);
     d.animationGroup->addAnimation(d.textAnimation);
-//    d.animationGroup->addAnimation(d.rotationAnimation);
+    d.animationGroup->addAnimation(d.rotationAnimation);
     d.animationGroup->start();
     connect(d.animationGroup, SIGNAL(finished()), this, SIGNAL(raised()));
     setZValue(10);
@@ -180,11 +200,14 @@ void FrameItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
 void FrameItem::lower()
 {
     Q_ASSERT(d.animationGroup);
+    qDebug() << static_cast<GraphicsScene*>(scene())->itemGeometry(this) << d.row << d.column;
     d.geometryAnimation->setEndValue(static_cast<GraphicsScene*>(scene())->itemGeometry(this));
     d.rotationAnimation->setEndValue(0);
+    delete d.textAnimation;
+    d.textAnimation = 0;
     connect(d.animationGroup, SIGNAL(finished()), this, SLOT(onLowered()));
-    setProperty("originalGeometry", QVariant());
     d.animationGroup->start();
+    d.state = Lowering;
 }
 
 void FrameItem::onLowered()
@@ -193,6 +216,9 @@ void FrameItem::onLowered()
     delete d.animationGroup;
     d.animationGroup = 0;
     d.geometryAnimation = 0;
+    d.rotationAnimation = 0;
+    d.textAnimation = 0;
+    d.state = Lowered;
     emit lowered();
 }
 
@@ -349,12 +375,26 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rect)
         const QList<FrameItem*> &frames = d.frameItems.at(x);
         for (int y=0; y<rows; ++y) {
             FrameItem *frame = frames.at(y);
-            if (frame == d.raised) {
-                frame->setGeometry(::raisedGeometry(rect));
-            } else if (!frame->isAnimating()) {
-                frame->setGeometry(::itemGeometry(1 + y, x, rows + 1, cols, rect));
-            } else {
-                frame->d.geometryAnimation->setEndValue(::raisedGeometry(rect));
+            QRectF r;
+            switch (frame->state()) {
+            case FrameItem::Lowered:
+            case FrameItem::Lowering:
+                r = ::itemGeometry(1 + y, x, rows + 1, cols, rect);
+                if (frame->state() == FrameItem::Lowered) {
+                    frame->setGeometry(r);
+                } else {
+                    frame->d.geometryAnimation->setEndValue(r);
+                }
+                break;
+            case FrameItem::Raised:
+            case FrameItem::Raising:
+                r = ::raisedGeometry(rect);
+                if (frame->state() == FrameItem::Raised) {
+                    frame->setGeometry(r);
+                } else {
+                    frame->d.geometryAnimation->setEndValue(r);
+                }
+                break;
             }
         }
     }

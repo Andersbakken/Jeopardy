@@ -32,7 +32,8 @@ public:
     virtual void mousePressEvent(QGraphicsSceneMouseEvent *event);
     qreal yRotation() const;
     void setYRotation(qreal yy);
-    bool isAnimating() const;
+    enum State { Raising, Raised, Lowering, Lowered };
+    State state() const;
 public slots:
     void onLowered();
 signals:
@@ -40,6 +41,7 @@ signals:
     void lowered();
 private:
     struct Data {
+	State state;
         int value;
         qreal yRotation;
         QString question, answer;
