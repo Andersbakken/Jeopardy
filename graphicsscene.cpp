@@ -48,16 +48,12 @@ static inline void initTextLayout(QTextLayout *layout, const QRectF &rect)
 }
 
 
-class TextAnimation : public QVariantAnimation
+class TextAnimation : public QPropertyAnimation
 {
 public:
-    TextAnimation(QGraphicsWidget *w)
-        : widget(w)
+    TextAnimation(QObject *o, const QByteArray &propertyName)
+        : QPropertyAnimation(o, propertyName)
     {}
-    virtual void updateCurrentValue(const QVariant &)
-    {
-        widget->update();
-    }
     virtual QVariant interpolated(const QVariant &from, const QVariant &to, qreal progress) const
     {
         if (qFuzzyIsNull(progress)) {
@@ -473,13 +469,23 @@ void GraphicsScene::click(FrameItem *frame)
     d.raisedState->assignProperty(frame, "geometry", ::raisedGeometry(sceneRect()));
     d.raisedState->assignProperty(frame, "zValue", 1.0);
     d.raisedState->assignProperty(frame, "yRotation", 360.0);
+    d.raisedState->assignProperty(frame, "text", frame->valueString());
+
+    d.showQuestionState->assignProperty(frame, "geometry", frame->question());
+
+    d.showAnswerState->assignProperty(frame, "answer", frame->question());
 
     QParallelAnimationGroup *group = new QParallelAnimationGroup(d.normalState);
     group->addAnimation(new QPropertyAnimation(frame, "geometry"));
     group->addAnimation(new QPropertyAnimation(frame, "zValue"));
     group->addAnimation(new QPropertyAnimation(frame, "yRotation"));
 
-//    QAbstractTransition *transition =
+    TextAnimation *textAnimation = new TextAnimation(frame, "text");
+
+    QAbstractTransition *transition = d.normalState->addTransition(this, SIGNAL(showQuestion()), d.raisedState);
+    transition->addAnimation(group);
+    transition = d.normalState->addTransition(this, SIGNAL(showQuestion()), d.raisedState);
+
 
         // ### addTransition stuff
 

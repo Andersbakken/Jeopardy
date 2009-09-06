@@ -79,6 +79,11 @@ public:
     QRectF itemGeometry(FrameItem *item) const;
     void mousePressEvent(QGraphicsSceneMouseEvent *event);
     void click(FrameItem *frame);
+signals:
+    void correctAnswer();
+    void wrongAnswer();
+    void showQuestion();
+    vodi showAnswer();
 public slots:
     void onSceneRectChanged(const QRectF &rect);
     void onFrameRaised();
