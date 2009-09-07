@@ -61,56 +61,59 @@ public:
     Proxy(QObject *parent = 0)
         : QObject(parent)
     {
-        d.frame = 0;
+        d.activeFrame = 0;
     }
 
     qreal yRotation() const
     {
-        return d.frame ? d.frame->yRotation() : qreal(0.0);
+        return d.activeFrame ? d.activeFrame->yRotation() : qreal(0.0);
     }
 
     void setYRotation(qreal yy)
     {
-        if (d.frame)
-            d.frame->setYRotation(yy);
+        if (d.activeFrame)
+            d.activeFrame->setYRotation(yy);
     }
 
     QString text() const
     {
-        return d.frame ? d.frame->text() : QString();
+        return d.activeFrame ? d.activeFrame->text() : QString();
     }
 
     void setText(const QString &tt)
     {
-        if (d.frame)
-            d.frame->setText(tt);
+        if (d.activeFrame)
+            d.activeFrame->setText(tt);
     }
 
     QRectF geometry() const
     {
-        return d.frame ? d.frame->geometry() : QRectF();
+        return d.activeFrame ? d.activeFrame->geometry() : QRectF();
     }
 
     void setGeometry(const QRectF &tt)
     {
-        if (d.frame)
-            d.frame->setGeometry(tt);
+        if (d.activeFrame)
+            d.activeFrame->setGeometry(tt);
     }
 
     void setActiveFrame(FrameItem *frame)
     {
-        if (d.frame) {
-            d.frame->setZValue(0);
+        if (d.activeFrame) {
+            d.activeFrame->setZValue(0);
         }
-        d.frame = frame;
-        if (d.frame) {
-            d.frame->setZValue(10);
+        d.activeFrame = frame;
+        if (d.activeFrame) {
+            d.activeFrame->setZValue(10);
         }
     }
-
+    FrameItem *activeFrame() const
+    {
+        return d.activeFrame;
+    }
 private:
     struct Data {
-        FrameItem *frame;
+        FrameItem *activeFrame;
     } d;
 };
 
@@ -144,6 +147,7 @@ public slots:
     void onSceneRectChanged(const QRectF &rect);
     void onFrameRaised();
     void onFrameLowered();
+    void onStateEntered();
 private:
     struct Data {
         QStateMachine stateMachine;

@@ -121,7 +121,7 @@ FrameItem::FrameItem(int row, int column)
 {
     d.row = row;
     d.column = column;
-    setCacheMode(ItemCoordinateCache);
+//    setCacheMode(ItemCoordinateCache);
     d.value = 0;
 }
 
@@ -167,16 +167,27 @@ qreal FrameItem::yRotation() const
 
 void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
 {
-    const QBrush brush = QColor(0x3366ff);
+    QBrush brush = QColor(0x3366ff);
+//    if (painter->worldTransform().m
+    const QTransform &worldTransform = painter->worldTransform();
+    bool mirrored = false;
+    if (worldTransform.m11() < 0 || worldTransform.m22() < 0) {
+        mirrored = true;
+        brush = Qt::black;
+//     if (
+//     if (d.text == "200$" && d.column == 2) {
+//         qDebug() << painter->transform() << painter->worldTransform();
+    }
     qDrawShadePanel(painter, option->rect, palette(), false, 5, &brush);
-    painter->setPen(Qt::white);
-    QString t;
-    enum { Margin = 6 } ;
-    const QRectF r = option->rect.adjusted(Margin, Margin, -Margin, -Margin);
-    QTextLayout layout(d.text);
-    ::initTextLayout(&layout, r, r.height() / 5);
-    painter->setPen(Qt::white);
-    layout.draw(painter, QPointF());
+    if (!mirrored) {
+        painter->setPen(Qt::white);
+        enum { Margin = 6 } ;
+        const QRectF r = option->rect.adjusted(Margin, Margin, -Margin, -Margin);
+        QTextLayout layout(d.text);
+        ::initTextLayout(&layout, r, r.height() / 5);
+        painter->setPen(Qt::white);
+        layout.draw(painter, QPointF());
+    }
 }
 
 
@@ -233,16 +244,27 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.sceneRectChangedBlocked = false;
 
     d.normalState = new QState(&d.stateMachine);
+    d.normalState->setObjectName("normalState");
     d.normalState->assignProperty(&d.proxy, "yRotation", 0.0);
+    d.normalState->assignProperty(&d.proxy, "text", "zot");
+//    connect(d.normalState, SIGNAL(entered()), this, SLOT(onStateEntered()));
 
     d.showQuestionState = new QState(&d.stateMachine);
+    d.showQuestionState->setObjectName("showQuestionState");
     d.showQuestionState->assignProperty(&d.proxy, "yRotation", 360.0);
+    d.showQuestionState->assignProperty(&d.proxy, "text", "bar");
+//    connect(d.showQuestionState, SIGNAL(entered()), this, SLOT(onStateEntered()));
 
     d.showAnswerState = new QState(&d.stateMachine);
+    d.showAnswerState->setObjectName("showAnswerState");
+    d.showAnswerState->assignProperty(&d.proxy, "text", "foo");
+
+    qDebug() << d.normalState << d.showQuestionState << d.showAnswerState;
+//    connect(d.showAnswerState, SIGNAL(entered()), this, SLOT(onStateEntered()));
 
     enum { Duration = 1000 };
     QSequentialAnimationGroup *group = new QSequentialAnimationGroup(&d.stateMachine);
-    QParallelAnimationGroup *parallel = new QParallelAnimationGroup(group);
+    QParallelAnimationGroup *parallel = new QParallelAnimationGroup;
     QPropertyAnimation *propertyAnimation;
     parallel->addAnimation(propertyAnimation = new QPropertyAnimation(&d.proxy, "geometry"));
     propertyAnimation->setDuration(Duration);
@@ -250,15 +272,17 @@ GraphicsScene::GraphicsScene(QObject *parent)
     propertyAnimation->setDuration(Duration);
     group->addAnimation(parallel);
     group->addPause(500);
-    group->addAnimation(propertyAnimation = new TextAnimation(&d.proxy, "text"));
-    propertyAnimation->setDuration(Duration);
+    TextAnimation *textAnimation = new TextAnimation(&d.proxy, "text");
+    textAnimation->setDuration(Duration);
+    group->addAnimation(textAnimation);
 
     QAbstractTransition *transition = d.normalState->addTransition(this, SIGNAL(showQuestion()), d.showQuestionState);
     transition->addAnimation(group);
     transition = d.showQuestionState->addTransition(this, SIGNAL(showAnswer()), d.showAnswerState);
-//    transition->addAnimation(textAnimation);
+    transition->addAnimation(textAnimation);
 //    connect(d.raisedState, SIGNAL(polished()), this, SIGNAL(showQuestion()));
     d.stateMachine.setInitialState(d.normalState);
+    qDebug() << group->animationCount();
     d.stateMachine.start();
 //        QApplication::sendPostedEvents(&d.stateMachine, 0);
     // ### hack needed to work around QueuedConnection initialization in QStateMachine
@@ -346,26 +370,12 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rect)
         for (int y=0; y<rows; ++y) {
             FrameItem *frame = frames.at(y);
             QRectF r;
-//             switch (frame->state()) {
-//             case FrameItem::Lowered:
-//             case FrameItem::Lowering:
-            r = ::itemGeometry(1 + y, x, rows + 1, cols, rect);
-//                if (frame->state() == FrameItem::Lowered) {
+            if (frame == d.proxy.activeFrame()) {
+                r = ::raisedGeometry(rect);
+            } else {
+                r = ::itemGeometry(1 + y, x, rows + 1, cols, rect);
+            }
             frame->setGeometry(r);
-//                 } else {
-//                     frame->d.geometryAnimation->setEndValue(r);
-//                 }
-//                 break;
-//             case FrameItem::Raised:
-//             case FrameItem::Raising:
-//                 r = ::raisedGeometry(rect);
-//                 if (frame->state() == FrameItem::Raised) {
-//                     frame->setGeometry(r);
-//                 } else {
-//                     frame->d.geometryAnimation->setEndValue(r);
-//                 }
-//                 break;
-//             }
         }
     }
     d.sceneRectChangedBlocked = false;
@@ -424,11 +434,10 @@ void GraphicsScene::setupStateMachine(FrameItem *frame)
     d.proxy.setActiveFrame(frame);
     d.normalState->assignProperty(&d.proxy, "geometry", itemGeometry(frame));
     d.normalState->assignProperty(&d.proxy, "text", frame->valueString());
-
-    d.showQuestionState = new QState(&d.stateMachine);
     d.showQuestionState->assignProperty(&d.proxy, "text", frame->question());
-    qDebug() << frame->question();
-
-    d.showAnswerState = new QState(&d.stateMachine);
     d.showAnswerState->assignProperty(&d.proxy, "text", frame->answer());
+}
+void GraphicsScene::onStateEntered()
+{
+    qDebug() << sender()->objectName();
 }
