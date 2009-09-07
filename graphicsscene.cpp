@@ -19,10 +19,9 @@ static inline QRectF raisedGeometry(const QRectF &sceneRect)
                               -sceneRect.width() * adjust, -sceneRect.height() * adjust);
 }
 
-static inline void initTextLayout(QTextLayout *layout, const QRectF &rect)
+static inline void initTextLayout(QTextLayout *layout, const QRectF &rect, int pixelSize)
 {
     layout->setCacheEnabled(true);
-    int pixelSize = rect.height() / 3;
     forever {
         layout->clearLayout();
         QFont f;
@@ -113,7 +112,7 @@ void TopicItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
     qDrawShadePanel(painter, option->rect, palette(), false, Margin / 2, &brush);
     const QRectF r = option->rect.adjusted(Margin, Margin, -Margin, -Margin);
     QTextLayout layout(d.text);
-    ::initTextLayout(&layout, r);
+    ::initTextLayout(&layout, r, r.height() / 2);
     painter->setPen(Qt::white);
     layout.draw(painter, QPointF());
 }
@@ -142,18 +141,6 @@ QString FrameItem::valueString() const
     return d.valueString;
 }
 
-void FrameItem::timerEvent(QTimerEvent *e)
-{
-    if (e->timerId() == d.answerTimer.timerId()) {
-        if (d.timer.elapsed() >= TimeOut) {
-
-        }
-        update();
-    } else {
-        QGraphicsWidget::timerEvent(e);
-    }
-}
-
 void FrameItem::setText(const QString &text)
 {
     d.text = text;
@@ -177,80 +164,6 @@ qreal FrameItem::yRotation() const
 {
     return d.yRotation;
 }
-#if 0
-void FrameItem::raise()
-{
-    d.state = Raising;
-    enum { Duration = 1000 };
-    d.parallelAnimationGroup = new QParallelAnimationGroup;
-    d.animationGroup = new QSequentialAnimationGroup;
-    d.geometryAnimation = new QPropertyAnimation;
-    d.geometryAnimation->setDuration(Duration);
-    d.geometryAnimation->setTargetObject(this);
-    d.geometryAnimation->setPropertyName("geometry");
-
-    d.geometryAnimation->setEndValue(::raisedGeometry(scene()->sceneRect()));
-    d.rotationAnimation = new QPropertyAnimation;
-    d.rotationAnimation->setDuration(Duration);
-    d.rotationAnimation->setTargetObject(this);
-    d.rotationAnimation->setPropertyName("yRotation");
-    d.rotationAnimation->setEndValue(360);
-
-    d.textAnimation = new TextAnimation(this);
-    d.textAnimation->setStartValue(QString::number(d.value));
-    d.textAnimation->setEndValue(d.question);
-    d.textAnimation->setDuration(Duration);
-
-    d.parallelAnimationGroup->addAnimation(d.geometryAnimation);
-    d.parallelAnimationGroup->addAnimation(d.textAnimation);
-    d.animationGroup->addAnimation(d.parallelAnimationGroup);
-    d.animationGroup->addAnimation(d.textAnimation);
-    d.animationGroup->start();
-    connect(d.animationGroup, SIGNAL(finished()), this, SIGNAL(raised()));
-    connect(d.parallelAnimationGroup, SIGNAL(finished()), this, SLOT(onQuestionShown()));
-    setZValue(10);
-}
-
-void FrameItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
-{
-    if (d.animationGroup && d.animationGroup->state() == QAbstractAnimation::Stopped) {
-        lower();
-    } else {
-        raise();
-    }
-}
-
-
-void FrameItem::lower()
-{
-    Q_ASSERT(d.animationGroup);
-    d.geometryAnimation->setEndValue(static_cast<GraphicsScene*>(scene())->itemGeometry(this));
-    d.rotationAnimation->setEndValue(0);
-    delete d.textAnimation;
-    d.textAnimation = 0;
-    connect(d.animationGroup, SIGNAL(finished()), this, SLOT(onLowered()));
-    d.animationGroup->start();
-    d.state = Lowering;
-}
-
-void FrameItem::onLowered()
-{
-    setZValue(0);
-    d.geometryAnimation = 0;
-    d.rotationAnimation = 0;
-    d.textAnimation = 0;
-    d.state = Lowered;
-    d.animationGroup->deleteLater();
-    d.animationGroup = 0;
-    emit lowered();
-}
-
-void FrameItem::onQuestionShown()
-{
-    d.timer.restart();
-    d.answerTimer.start(50, this);
-}
-#endif
 
 void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
 {
@@ -261,7 +174,7 @@ void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
     enum { Margin = 6 } ;
     const QRectF r = option->rect.adjusted(Margin, Margin, -Margin, -Margin);
     QTextLayout layout(d.text);
-    ::initTextLayout(&layout, r);
+    ::initTextLayout(&layout, r, r.height() / 5);
     painter->setPen(Qt::white);
     layout.draw(painter, QPointF());
 }
@@ -315,7 +228,7 @@ GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
     d.activeFrame = 0;
-    d.normalState = d.raisedState = d.showQuestionState = d.showAnswerState = d.correctAnswerState = d.wrongAnswerState = 0;
+    d.normalState = d.showQuestionState = d.showAnswerState = d.correctAnswerState = d.wrongAnswerState = 0;
     d.raised = 0;
     d.sceneRectChangedBlocked = false;
 }
@@ -372,8 +285,6 @@ bool GraphicsScene::load(QIODevice *device)
                 frame->setAnswer(split.value(1));
                 frame->setText(frame->valueString());
 
-//                 connect(frame, SIGNAL(raised()), this, SLOT(onFrameRaised()));
-//                 connect(frame, SIGNAL(lowered()), this, SLOT(onFrameLowered()));
                 addItem(frame);
                 d.frameItems.last().append(frame);
                 if (count == 4)
@@ -461,10 +372,7 @@ void GraphicsScene::click(FrameItem *frame)
 {
     if (!d.activeFrame) {
         setupStateMachine(frame);
-        QEventLoop loop;
-        QTimer::singleShot(0, &loop, SLOT(quit()));
-        loop.exec(); // ### don't know why I have to do this stuff
-        emit raise();
+        emit showQuestion();
     }
 }
 
@@ -486,33 +394,39 @@ void GraphicsScene::setupStateMachine(FrameItem *frame)
     d.normalState->assignProperty(frame, "geometry", itemGeometry(frame));
     d.normalState->assignProperty(frame, "z", 0);
     d.normalState->assignProperty(frame, "yRotation", 0.0);
-
-    d.raisedState = new QState(&d.stateMachine);
-    d.raisedState->assignProperty(frame, "geometry", ::raisedGeometry(sceneRect()));
-    d.raisedState->assignProperty(frame, "z", 1.0);
-    d.raisedState->assignProperty(frame, "yRotation", 360.0);
-    d.raisedState->assignProperty(frame, "text", frame->valueString());
+    d.normalState->assignProperty(frame, "text", frame->valueString());
 
     d.showQuestionState = new QState(&d.stateMachine);
+    d.showQuestionState->assignProperty(frame, "geometry", ::raisedGeometry(sceneRect()));
+    d.showQuestionState->assignProperty(frame, "z", 100.0);
+    d.showQuestionState->assignProperty(frame, "yRotation", 360.0);
     d.showQuestionState->assignProperty(frame, "text", frame->question());
 
     d.showAnswerState = new QState(&d.stateMachine);
     d.showAnswerState->assignProperty(frame, "text", frame->answer());
 
-    QParallelAnimationGroup *group = new QParallelAnimationGroup(d.normalState);
-    group->addAnimation(new QPropertyAnimation(frame, "geometry"));
-    group->addAnimation(new QPropertyAnimation(frame, "z"));
-    group->addAnimation(new QPropertyAnimation(frame, "yRotation"));
+    enum { Duration = 1000 };
+    QSequentialAnimationGroup *group = new QSequentialAnimationGroup(&d.stateMachine);
+    QParallelAnimationGroup *parallel = new QParallelAnimationGroup(group);
+    QPropertyAnimation *propertyAnimation;
+    parallel->addAnimation(propertyAnimation = new QPropertyAnimation(frame, "geometry"));
+    propertyAnimation->setDuration(Duration);
+    parallel->addAnimation(propertyAnimation = new QPropertyAnimation(frame, "z"));
+    propertyAnimation->setDuration(Duration);
+    parallel->addAnimation(propertyAnimation = new QPropertyAnimation(frame, "yRotation"));
+    propertyAnimation->setDuration(Duration);
+    group->addAnimation(parallel);
+    group->addPause(500);
+    group->addAnimation(propertyAnimation = new TextAnimation(frame, "text"));
+    propertyAnimation->setDuration(Duration);
 
-    TextAnimation *textAnimation = new TextAnimation(frame, "text");
-
-    QAbstractTransition *transition = d.normalState->addTransition(this, SIGNAL(raise()), d.raisedState);
+    QAbstractTransition *transition = d.normalState->addTransition(this, SIGNAL(showQuestion()), d.showQuestionState);
     transition->addAnimation(group);
-    transition = d.raisedState->addTransition(this, SIGNAL(showQuestion()), d.showQuestionState);
-    transition->addAnimation(textAnimation);
     transition = d.showQuestionState->addTransition(this, SIGNAL(showAnswer()), d.showAnswerState);
-    transition->addAnimation(textAnimation);
+//    transition->addAnimation(textAnimation);
+//    connect(d.raisedState, SIGNAL(polished()), this, SIGNAL(showQuestion()));
     d.stateMachine.setInitialState(d.normalState);
     d.stateMachine.start();
     QApplication::sendPostedEvents(&d.stateMachine, 0);
+    // ### hack needed to work around QueuedConnection initialization in QStateMachine
 }

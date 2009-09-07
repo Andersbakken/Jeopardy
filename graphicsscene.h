@@ -35,19 +35,10 @@ public:
     void setQuestion(const QString &question);
     QString answer() const;
     void setAnswer(const QString &answer);
-//     void raise();
-//     void lower();
     qreal yRotation() const;
     void setYRotation(qreal yy);
-    void timerEvent(QTimerEvent *e);
     void setText(const QString &text);
     QString text() const;
-// public slots:
-//     void onLowered();
-//     void onQuestionShown();
-// signals:
-//     void raised();
-//     void lowered();
 private:
     struct Data {
         QString text, question, answer, valueString;
@@ -81,7 +72,6 @@ public:
     void click(FrameItem *frame);
     void setupStateMachine(FrameItem *frame);
 signals:
-    void raise();
     void correctAnswer();
     void wrongAnswer();
     void showQuestion();
@@ -93,7 +83,7 @@ public slots:
 private:
     struct Data {
         QStateMachine stateMachine;
-        QState *normalState, *raisedState, *showQuestionState, *showAnswerState, *correctAnswerState, *wrongAnswerState;
+        QState *normalState, *showQuestionState, *showAnswerState, *correctAnswerState, *wrongAnswerState;
         FrameItem *raised;
         QList<TopicItem*> topicItems;
         QList<QList<FrameItem*> > frameItems;
