@@ -231,6 +231,37 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.normalState = d.showQuestionState = d.showAnswerState = d.correctAnswerState = d.wrongAnswerState = 0;
     d.raised = 0;
     d.sceneRectChangedBlocked = false;
+
+    d.normalState = new QState(&d.stateMachine);
+    d.normalState->assignProperty(&d.proxy, "yRotation", 0.0);
+
+    d.showQuestionState = new QState(&d.stateMachine);
+    d.showQuestionState->assignProperty(&d.proxy, "yRotation", 360.0);
+
+    d.showAnswerState = new QState(&d.stateMachine);
+
+    enum { Duration = 1000 };
+    QSequentialAnimationGroup *group = new QSequentialAnimationGroup(&d.stateMachine);
+    QParallelAnimationGroup *parallel = new QParallelAnimationGroup(group);
+    QPropertyAnimation *propertyAnimation;
+    parallel->addAnimation(propertyAnimation = new QPropertyAnimation(&d.proxy, "geometry"));
+    propertyAnimation->setDuration(Duration);
+    parallel->addAnimation(propertyAnimation = new QPropertyAnimation(&d.proxy, "yRotation"));
+    propertyAnimation->setDuration(Duration);
+    group->addAnimation(parallel);
+    group->addPause(500);
+    group->addAnimation(propertyAnimation = new TextAnimation(&d.proxy, "text"));
+    propertyAnimation->setDuration(Duration);
+
+    QAbstractTransition *transition = d.normalState->addTransition(this, SIGNAL(showQuestion()), d.showQuestionState);
+    transition->addAnimation(group);
+    transition = d.showQuestionState->addTransition(this, SIGNAL(showAnswer()), d.showAnswerState);
+//    transition->addAnimation(textAnimation);
+//    connect(d.raisedState, SIGNAL(polished()), this, SIGNAL(showQuestion()));
+    d.stateMachine.setInitialState(d.normalState);
+    d.stateMachine.start();
+//        QApplication::sendPostedEvents(&d.stateMachine, 0);
+    // ### hack needed to work around QueuedConnection initialization in QStateMachine
 }
 
 bool GraphicsScene::load(QIODevice *device)
@@ -302,6 +333,9 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rect)
 {
     if (d.sceneRectChangedBlocked || rect.isEmpty())
         return;
+
+    d.showQuestionState->assignProperty(&d.proxy, "geometry", ::raisedGeometry(sceneRect()));
+
     d.sceneRectChangedBlocked = true;
     const int cols = d.topicItems.size();
     const int rows = d.frameItems.value(0).size();
@@ -386,47 +420,15 @@ void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 
 void GraphicsScene::setupStateMachine(FrameItem *frame)
 {
-    // use a proxy item so I don't have to set up this stuff all the time
-    Q_ASSERT(!d.activeFrame);
     Q_ASSERT(frame);
-    d.activeFrame = frame;
-    d.normalState = new QState(&d.stateMachine);
-    d.normalState->assignProperty(frame, "geometry", itemGeometry(frame));
-    d.normalState->assignProperty(frame, "z", 0);
-    d.normalState->assignProperty(frame, "yRotation", 0.0);
-    d.normalState->assignProperty(frame, "text", frame->valueString());
+    d.proxy.setActiveFrame(frame);
+    d.normalState->assignProperty(&d.proxy, "geometry", itemGeometry(frame));
+    d.normalState->assignProperty(&d.proxy, "text", frame->valueString());
 
     d.showQuestionState = new QState(&d.stateMachine);
-    d.showQuestionState->assignProperty(frame, "geometry", ::raisedGeometry(sceneRect()));
-    d.showQuestionState->assignProperty(frame, "z", 100.0);
-    d.showQuestionState->assignProperty(frame, "yRotation", 360.0);
-    d.showQuestionState->assignProperty(frame, "text", frame->question());
+    d.showQuestionState->assignProperty(&d.proxy, "text", frame->question());
+    qDebug() << frame->question();
 
     d.showAnswerState = new QState(&d.stateMachine);
-    d.showAnswerState->assignProperty(frame, "text", frame->answer());
-
-    enum { Duration = 1000 };
-    QSequentialAnimationGroup *group = new QSequentialAnimationGroup(&d.stateMachine);
-    QParallelAnimationGroup *parallel = new QParallelAnimationGroup(group);
-    QPropertyAnimation *propertyAnimation;
-    parallel->addAnimation(propertyAnimation = new QPropertyAnimation(frame, "geometry"));
-    propertyAnimation->setDuration(Duration);
-    parallel->addAnimation(propertyAnimation = new QPropertyAnimation(frame, "z"));
-    propertyAnimation->setDuration(Duration);
-    parallel->addAnimation(propertyAnimation = new QPropertyAnimation(frame, "yRotation"));
-    propertyAnimation->setDuration(Duration);
-    group->addAnimation(parallel);
-    group->addPause(500);
-    group->addAnimation(propertyAnimation = new TextAnimation(frame, "text"));
-    propertyAnimation->setDuration(Duration);
-
-    QAbstractTransition *transition = d.normalState->addTransition(this, SIGNAL(showQuestion()), d.showQuestionState);
-    transition->addAnimation(group);
-    transition = d.showQuestionState->addTransition(this, SIGNAL(showAnswer()), d.showAnswerState);
-//    transition->addAnimation(textAnimation);
-//    connect(d.raisedState, SIGNAL(polished()), this, SIGNAL(showQuestion()));
-    d.stateMachine.setInitialState(d.normalState);
-    d.stateMachine.start();
-    QApplication::sendPostedEvents(&d.stateMachine, 0);
-    // ### hack needed to work around QueuedConnection initialization in QStateMachine
+    d.showAnswerState->assignProperty(&d.proxy, "text", frame->answer());
 }

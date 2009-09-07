@@ -51,6 +51,70 @@ private:
     friend class GraphicsScene;
 };
 
+class Proxy : public QObject
+{
+    Q_OBJECT
+    Q_PROPERTY(qreal yRotation READ yRotation WRITE setYRotation)
+    Q_PROPERTY(QString text READ text WRITE setText)
+    Q_PROPERTY(QRectF geometry READ geometry WRITE setGeometry)
+public:
+    Proxy(QObject *parent = 0)
+        : QObject(parent)
+    {
+        d.frame = 0;
+    }
+
+    qreal yRotation() const
+    {
+        return d.frame ? d.frame->yRotation() : qreal(0.0);
+    }
+
+    void setYRotation(qreal yy)
+    {
+        if (d.frame)
+            d.frame->setYRotation(yy);
+    }
+
+    QString text() const
+    {
+        return d.frame ? d.frame->text() : QString();
+    }
+
+    void setText(const QString &tt)
+    {
+        if (d.frame)
+            d.frame->setText(tt);
+    }
+
+    QRectF geometry() const
+    {
+        return d.frame ? d.frame->geometry() : QRectF();
+    }
+
+    void setGeometry(const QRectF &tt)
+    {
+        if (d.frame)
+            d.frame->setGeometry(tt);
+    }
+
+    void setActiveFrame(FrameItem *frame)
+    {
+        if (d.frame) {
+            d.frame->setZValue(0);
+        }
+        d.frame = frame;
+        if (d.frame) {
+            d.frame->setZValue(10);
+        }
+    }
+
+private:
+    struct Data {
+        FrameItem *frame;
+    } d;
+};
+
+
 class SelectorItem : public QGraphicsWidget
 {
 public:
@@ -89,6 +153,7 @@ private:
         QList<QList<FrameItem*> > frameItems;
         bool sceneRectChangedBlocked;
         FrameItem *activeFrame;
+        Proxy proxy;
     } d;
 };
 
