@@ -79,11 +79,13 @@ public:
     QRectF itemGeometry(FrameItem *item) const;
     void mousePressEvent(QGraphicsSceneMouseEvent *event);
     void click(FrameItem *frame);
+    void setupStateMachine(FrameItem *frame);
 signals:
+    void raise();
     void correctAnswer();
     void wrongAnswer();
     void showQuestion();
-    vodi showAnswer();
+    void showAnswer();
 public slots:
     void onSceneRectChanged(const QRectF &rect);
     void onFrameRaised();
@@ -96,6 +98,7 @@ private:
         QList<TopicItem*> topicItems;
         QList<QList<FrameItem*> > frameItems;
         bool sceneRectChangedBlocked;
+        FrameItem *activeFrame;
     } d;
 };
 

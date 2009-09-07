@@ -314,6 +314,7 @@ void SelectorItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opti
 GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
+    d.activeFrame = 0;
     d.normalState = d.raisedState = d.showQuestionState = d.showAnswerState = d.correctAnswerState = d.wrongAnswerState = 0;
     d.raised = 0;
     d.sceneRectChangedBlocked = false;
@@ -458,37 +459,13 @@ void GraphicsScene::onFrameLowered()
 
 void GraphicsScene::click(FrameItem *frame)
 {
-    Q_ASSERT(frame);
-    if (d.normalState)
-        return;
-    d.normalState = new QState(&d.stateMachine);
-    d.normalState->assignProperty(frame, "geometry", itemGeometry(frame));
-    d.normalState->assignProperty(frame, "zValue", 0);
-    d.normalState->assignProperty(frame, "yRotation", 0.0);
-
-    d.raisedState->assignProperty(frame, "geometry", ::raisedGeometry(sceneRect()));
-    d.raisedState->assignProperty(frame, "zValue", 1.0);
-    d.raisedState->assignProperty(frame, "yRotation", 360.0);
-    d.raisedState->assignProperty(frame, "text", frame->valueString());
-
-    d.showQuestionState->assignProperty(frame, "geometry", frame->question());
-
-    d.showAnswerState->assignProperty(frame, "answer", frame->question());
-
-    QParallelAnimationGroup *group = new QParallelAnimationGroup(d.normalState);
-    group->addAnimation(new QPropertyAnimation(frame, "geometry"));
-    group->addAnimation(new QPropertyAnimation(frame, "zValue"));
-    group->addAnimation(new QPropertyAnimation(frame, "yRotation"));
-
-    TextAnimation *textAnimation = new TextAnimation(frame, "text");
-
-    QAbstractTransition *transition = d.normalState->addTransition(this, SIGNAL(showQuestion()), d.raisedState);
-    transition->addAnimation(group);
-    transition = d.normalState->addTransition(this, SIGNAL(showQuestion()), d.raisedState);
-
-
-        // ### addTransition stuff
-
+    if (!d.activeFrame) {
+        setupStateMachine(frame);
+        QEventLoop loop;
+        QTimer::singleShot(0, &loop, SLOT(quit()));
+        loop.exec(); // ### don't know why I have to do this stuff
+        emit raise();
+    }
 }
 
 void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
@@ -497,4 +474,45 @@ void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
     if (frame) {
         click(frame);
     }
+}
+
+void GraphicsScene::setupStateMachine(FrameItem *frame)
+{
+    // use a proxy item so I don't have to set up this stuff all the time
+    Q_ASSERT(!d.activeFrame);
+    Q_ASSERT(frame);
+    d.activeFrame = frame;
+    d.normalState = new QState(&d.stateMachine);
+    d.normalState->assignProperty(frame, "geometry", itemGeometry(frame));
+    d.normalState->assignProperty(frame, "z", 0);
+    d.normalState->assignProperty(frame, "yRotation", 0.0);
+
+    d.raisedState = new QState(&d.stateMachine);
+    d.raisedState->assignProperty(frame, "geometry", ::raisedGeometry(sceneRect()));
+    d.raisedState->assignProperty(frame, "z", 1.0);
+    d.raisedState->assignProperty(frame, "yRotation", 360.0);
+    d.raisedState->assignProperty(frame, "text", frame->valueString());
+
+    d.showQuestionState = new QState(&d.stateMachine);
+    d.showQuestionState->assignProperty(frame, "text", frame->question());
+
+    d.showAnswerState = new QState(&d.stateMachine);
+    d.showAnswerState->assignProperty(frame, "text", frame->answer());
+
+    QParallelAnimationGroup *group = new QParallelAnimationGroup(d.normalState);
+    group->addAnimation(new QPropertyAnimation(frame, "geometry"));
+    group->addAnimation(new QPropertyAnimation(frame, "z"));
+    group->addAnimation(new QPropertyAnimation(frame, "yRotation"));
+
+    TextAnimation *textAnimation = new TextAnimation(frame, "text");
+
+    QAbstractTransition *transition = d.normalState->addTransition(this, SIGNAL(raise()), d.raisedState);
+    transition->addAnimation(group);
+    transition = d.raisedState->addTransition(this, SIGNAL(showQuestion()), d.showQuestionState);
+    transition->addAnimation(textAnimation);
+    transition = d.showQuestionState->addTransition(this, SIGNAL(showAnswer()), d.showAnswerState);
+    transition->addAnimation(textAnimation);
+    d.stateMachine.setInitialState(d.normalState);
+    d.stateMachine.start();
+    QApplication::sendPostedEvents(&d.stateMachine, 0);
 }
