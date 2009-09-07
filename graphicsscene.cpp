@@ -105,6 +105,7 @@ QString TopicItem::text() const
     return d.text;
 }
 
+
 void TopicItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
 {
     enum { Margin = 6 } ;
@@ -119,10 +120,28 @@ void TopicItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
 
 FrameItem::FrameItem(int row, int column)
 {
+    d.answerProgress = 0;
+    d.answerProgressBarProxy = 0;
+    d.answerProgressBar = 0;
     d.row = row;
     d.column = column;
-//    setCacheMode(ItemCoordinateCache);
+//    setCacheMode(ItemCoordinateCache); // ### need this to know when it's reversed
     d.value = 0;
+}
+
+void FrameItem::resizeEvent(QGraphicsSceneResizeEvent *event)
+{
+    QGraphicsWidget::resizeEvent(event);
+    updateProgressBarGeometry();
+}
+
+void FrameItem::updateProgressBarGeometry()
+{
+    if (d.answerProgressBarProxy) {
+        QRectF r(QPointF(), QSizeF(rect().width(), d.answerProgressBar->sizeHint().height()));
+        r.moveBottomLeft(rect().bottomLeft());
+        d.answerProgressBarProxy->setGeometry(r);
+    }
 }
 
 void FrameItem::setValue(int value)
@@ -152,6 +171,11 @@ QString FrameItem::text() const
     return d.text;
 }
 
+GraphicsScene *FrameItem::graphicsScene() const
+{
+    return qobject_cast<GraphicsScene*>(scene());
+}
+
 void FrameItem::setYRotation(qreal yRotation)
 {
     d.yRotation = yRotation;
@@ -165,18 +189,44 @@ qreal FrameItem::yRotation() const
     return d.yRotation;
 }
 
+qreal FrameItem::answerProgress() const
+{
+    return d.answerProgress;
+}
+
+void FrameItem::setAnswerProgress(qreal answerProgress)
+{
+    d.answerProgress = answerProgress;
+    if (qFuzzyIsNull(d.answerProgress)) {
+        delete d.answerProgressBar;
+        d.answerProgressBar = 0;
+        delete d.answerProgressBarProxy;
+        d.answerProgressBarProxy = 0;
+    } else {
+
+        if (!d.answerProgressBar) {
+            d.answerProgressBar = new QProgressBar;
+            d.answerProgressBar->setRange(0, graphicsScene()->answerTime());
+            d.answerProgressBar->setTextVisible(true);
+            d.answerProgressBarProxy = new QGraphicsProxyWidget(this);
+            d.answerProgressBarProxy->setWidget(d.answerProgressBar);
+            updateProgressBarGeometry();
+        }
+        d.answerProgressBar->setValue(answerProgress * d.answerProgressBar->maximum());
+        d.answerProgress = answerProgress;
+    }
+
+}
+
+
 void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
 {
     QBrush brush = QColor(0x3366ff);
-//    if (painter->worldTransform().m
     const QTransform &worldTransform = painter->worldTransform();
     bool mirrored = false;
     if (worldTransform.m11() < 0 || worldTransform.m22() < 0) {
         mirrored = true;
         brush = Qt::black;
-//     if (
-//     if (d.text == "200$" && d.column == 2) {
-//         qDebug() << painter->transform() << painter->worldTransform();
     }
     qDrawShadePanel(painter, option->rect, palette(), false, 5, &brush);
     if (!mirrored) {
@@ -238,6 +288,7 @@ void SelectorItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opti
 GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
+    d.answerTime = 5000;
     d.activeFrame = 0;
     d.normalState = d.showQuestionState = d.showAnswerState = d.correctAnswerState = d.wrongAnswerState = 0;
     d.raised = 0;
@@ -246,21 +297,15 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.normalState = new QState(&d.stateMachine);
     d.normalState->setObjectName("normalState");
     d.normalState->assignProperty(&d.proxy, "yRotation", 0.0);
-    d.normalState->assignProperty(&d.proxy, "text", "zot");
-//    connect(d.normalState, SIGNAL(entered()), this, SLOT(onStateEntered()));
+    d.normalState->assignProperty(&d.proxy, "answerProgress", 0.0);
 
     d.showQuestionState = new QState(&d.stateMachine);
     d.showQuestionState->setObjectName("showQuestionState");
     d.showQuestionState->assignProperty(&d.proxy, "yRotation", 360.0);
-    d.showQuestionState->assignProperty(&d.proxy, "text", "bar");
-//    connect(d.showQuestionState, SIGNAL(entered()), this, SLOT(onStateEntered()));
+    d.showQuestionState->assignProperty(&d.proxy, "answerProgress", 1.0);
 
     d.showAnswerState = new QState(&d.stateMachine);
     d.showAnswerState->setObjectName("showAnswerState");
-    d.showAnswerState->assignProperty(&d.proxy, "text", "foo");
-
-    qDebug() << d.normalState << d.showQuestionState << d.showAnswerState;
-//    connect(d.showAnswerState, SIGNAL(entered()), this, SLOT(onStateEntered()));
 
     enum { Duration = 1000 };
     QSequentialAnimationGroup *group = new QSequentialAnimationGroup(&d.stateMachine);
@@ -276,16 +321,16 @@ GraphicsScene::GraphicsScene(QObject *parent)
     textAnimation->setDuration(Duration);
     group->addAnimation(textAnimation);
 
+    group->addAnimation(propertyAnimation = new QPropertyAnimation(&d.proxy, "answerProgress"));
+    propertyAnimation->setDuration(d.answerTime);
+
     QAbstractTransition *transition = d.normalState->addTransition(this, SIGNAL(showQuestion()), d.showQuestionState);
     transition->addAnimation(group);
     transition = d.showQuestionState->addTransition(this, SIGNAL(showAnswer()), d.showAnswerState);
     transition->addAnimation(textAnimation);
 //    connect(d.raisedState, SIGNAL(polished()), this, SIGNAL(showQuestion()));
     d.stateMachine.setInitialState(d.normalState);
-    qDebug() << group->animationCount();
     d.stateMachine.start();
-//        QApplication::sendPostedEvents(&d.stateMachine, 0);
-    // ### hack needed to work around QueuedConnection initialization in QStateMachine
 }
 
 bool GraphicsScene::load(QIODevice *device)
@@ -437,7 +482,10 @@ void GraphicsScene::setupStateMachine(FrameItem *frame)
     d.showQuestionState->assignProperty(&d.proxy, "text", frame->question());
     d.showAnswerState->assignProperty(&d.proxy, "text", frame->answer());
 }
-void GraphicsScene::onStateEntered()
+
+
+int GraphicsScene::answerTime() const
 {
-    qDebug() << sender()->objectName();
+    return d.answerTime;
 }
+

@@ -18,11 +18,10 @@ private:
     } d;
 };
 
+class GraphicsScene;
 class FrameItem : public QGraphicsWidget
 {
     Q_OBJECT
-    Q_PROPERTY(qreal yRotation READ yRotation WRITE setYRotation)
-    Q_PROPERTY(QString text READ text WRITE setText)
 public:
     FrameItem(int row, int col);
     enum { Type = QGraphicsItem::UserType + 2 };
@@ -37,16 +36,21 @@ public:
     void setAnswer(const QString &answer);
     qreal yRotation() const;
     void setYRotation(qreal yy);
+    qreal answerProgress() const;
+    void setAnswerProgress(qreal answerProgress);
     void setText(const QString &text);
     QString text() const;
+    virtual void resizeEvent(QGraphicsSceneResizeEvent *event);
 private:
+    void updateProgressBarGeometry();
+    GraphicsScene *graphicsScene() const;
     struct Data {
         QString text, question, answer, valueString;
         int value;
-        QBasicTimer answerTimer;
-        QTime timer;
-        qreal yRotation;
+        qreal yRotation, answerProgress;
         int row, column;
+        QGraphicsProxyWidget *answerProgressBarProxy;
+        QProgressBar *answerProgressBar;
     } d;
     friend class GraphicsScene;
 };
@@ -57,6 +61,7 @@ class Proxy : public QObject
     Q_PROPERTY(qreal yRotation READ yRotation WRITE setYRotation)
     Q_PROPERTY(QString text READ text WRITE setText)
     Q_PROPERTY(QRectF geometry READ geometry WRITE setGeometry)
+    Q_PROPERTY(qreal answerProgress READ answerProgress WRITE setAnswerProgress)
 public:
     Proxy(QObject *parent = 0)
         : QObject(parent)
@@ -95,6 +100,17 @@ public:
     {
         if (d.activeFrame)
             d.activeFrame->setGeometry(tt);
+    }
+
+    qreal answerProgress() const
+    {
+        return d.activeFrame ? d.activeFrame->answerProgress() : qreal(0.0);
+    }
+
+    void setAnswerProgress(qreal yy)
+    {
+        if (d.activeFrame)
+            d.activeFrame->setAnswerProgress(yy);
     }
 
     void setActiveFrame(FrameItem *frame)
@@ -138,6 +154,7 @@ public:
     void mousePressEvent(QGraphicsSceneMouseEvent *event);
     void click(FrameItem *frame);
     void setupStateMachine(FrameItem *frame);
+    int answerTime() const;
 signals:
     void correctAnswer();
     void wrongAnswer();
@@ -147,7 +164,6 @@ public slots:
     void onSceneRectChanged(const QRectF &rect);
     void onFrameRaised();
     void onFrameLowered();
-    void onStateEntered();
 private:
     struct Data {
         QStateMachine stateMachine;
@@ -158,6 +174,7 @@ private:
         bool sceneRectChangedBlocked;
         FrameItem *activeFrame;
         Proxy proxy;
+        int answerTime;
     } d;
 };
 
