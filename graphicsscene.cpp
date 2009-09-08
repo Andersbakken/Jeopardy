@@ -91,7 +91,7 @@ private:
     QGraphicsWidget *widget;
 };
 
-FrameItem::FrameItem(int row, int column)
+Item::Item(int row, int column)
 {
     d.answerProgress = 0;
     d.row = row;
@@ -101,82 +101,82 @@ FrameItem::FrameItem(int row, int column)
     d.yRotation = 0;
 }
 
-int FrameItem::row() const
+int Item::row() const
 {
     return d.row;
 }
 
-int FrameItem::column() const
+int Item::column() const
 {
     return d.column;
 }
 
-QColor FrameItem::backgroundColor() const
+QColor Item::backgroundColor() const
 {
     return d.backgroundColor;
 }
 
-void FrameItem::setBackgroundColor(const QColor &color)
+void Item::setBackgroundColor(const QColor &color)
 {
     d.backgroundColor = color;
     update();
 }
 
-QColor FrameItem::progressBarColor() const
+QColor Item::progressBarColor() const
 {
     return d.progressBarColor;
 }
 
-void FrameItem::setProgressBarColor(const QColor &color)
+void Item::setProgressBarColor(const QColor &color)
 {
     d.progressBarColor = color;
     update();
 }
 
-QColor FrameItem::textColor() const
+QColor Item::textColor() const
 {
     return d.textColor;
 }
 
-void FrameItem::setTextColor(const QColor &color)
+void Item::setTextColor(const QColor &color)
 {
     d.textColor = color;
     update();
 }
 
-void FrameItem::setValue(int value)
+void Item::setValue(int value)
 {
     d.value = value;
     d.valueString = d.text = QString("%1$").arg(value);
 }
 
-int FrameItem::value() const
+int Item::value() const
 {
     return d.value;
 }
 
-QString FrameItem::valueString() const
+QString Item::valueString() const
 {
     return d.valueString;
 }
 
-void FrameItem::setText(const QString &text)
+void Item::setText(const QString &text)
 {
     d.text = text;
     update();
 }
 
-QString FrameItem::text() const
+QString Item::text() const
 {
     return d.text;
 }
 
-GraphicsScene *FrameItem::graphicsScene() const
+GraphicsScene *Item::graphicsScene() const
 {
     return qobject_cast<GraphicsScene*>(scene());
 }
 
-void FrameItem::setYRotation(qreal yRotation)
+void Item::setYRotation(qreal yRotation)
 {
     d.yRotation = yRotation;
     QTransform transform;
@@ -187,23 +187,23 @@ void FrameItem::setYRotation(qreal yRotation)
     setTransform(transform);
 }
 
-qreal FrameItem::yRotation() const
+qreal Item::yRotation() const
 {
     return d.yRotation;
 }
 
-qreal FrameItem::answerProgress() const
+qreal Item::answerProgress() const
 {
     return d.answerProgress;
 }
 
-void FrameItem::setAnswerProgress(qreal answerProgress)
+void Item::setAnswerProgress(qreal answerProgress)
 {
     d.answerProgress = answerProgress;
     update();
 }
 
-void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
+void Item::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
 {
     QBrush brush = d.backgroundColor;
     const QTransform &worldTransform = painter->worldTransform();
@@ -236,22 +236,22 @@ void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
     }
 }
 
-QString FrameItem::question() const
+QString Item::question() const
 {
     return d.question;
 }
 
-void FrameItem::setQuestion(const QString &question)
+void Item::setQuestion(const QString &question)
 {
     d.question = question;
 }
 
-QString FrameItem::answer() const
+QString Item::answer() const
 {
     return d.answer;
 }
 
-void FrameItem::setAnswer(const QString &answer)
+void Item::setAnswer(const QString &answer)
 {
     d.answer = answer;
 }
@@ -283,7 +283,7 @@ void SelectorItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opti
 GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
-    d.answerTime = 5000;
+    d.answerTime = 600;
     d.sceneRectChangedBlocked = false;
 
     d.normalState = new QState(&d.stateMachine);
@@ -303,18 +303,23 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.showAnswerState->assignProperty(&d.proxy, "progressBarColor", Qt::red);
     d.showAnswerState->setObjectName("showAnswerState");
 
+    d.answerState = new QState(&d.stateMachine);
+    d.answerState->assignProperty(&d.proxy, "backgroundColor", Qt::yellow);
+    d.answerState->assignProperty(&d.proxy, "progressBarColor", Qt::blue);
+    d.answerState->setObjectName("answerState");
+
     d.wrongAnswerState = new QState(&d.stateMachine);
     d.wrongAnswerState->assignProperty(&d.proxy, "backgroundColor", Qt::red);
     d.wrongAnswerState->assignProperty(&d.proxy, "textColor", Qt::black);
-    d.wrongAnswerState->assignProperty(&d.proxy, "yRotation", 0.0);
     d.wrongAnswerState->assignProperty(&d.proxy, "answerProgress", 0.0);
+    d.wrongAnswerState->assignProperty(&d.proxy, "yRotation", 0.0);
     d.wrongAnswerState->setObjectName("wrongAnswerState");
 
     d.correctAnswerState = new QState(&d.stateMachine);
     d.correctAnswerState->assignProperty(&d.proxy, "backgroundColor", Qt::green);
     d.correctAnswerState->assignProperty(&d.proxy, "textColor", Qt::black);
-    d.correctAnswerState->assignProperty(&d.proxy, "yRotation", 0.0);
     d.correctAnswerState->assignProperty(&d.proxy, "answerProgress", 0.0);
+    d.correctAnswerState->assignProperty(&d.proxy, "yRotation", 0.0);
     d.correctAnswerState->setObjectName("correctAnswerState");
 
     enum { Duration = 1000 };
@@ -372,7 +377,7 @@ GraphicsScene::GraphicsScene(QObject *parent)
         textAnimation->setDuration(Duration / 2);
         sequential->addAnimation(textAnimation);
 
-        sequential->addPause(500);
+        sequential->addPause(2500);
 
         QParallelAnimationGroup *parallel = new QParallelAnimationGroup;
 
@@ -383,12 +388,20 @@ GraphicsScene::GraphicsScene(QObject *parent)
         QPropertyAnimation *yRotationAnimation = new QPropertyAnimation(&d.proxy, "yRotation");
         yRotationAnimation->setDuration(Duration);
         parallel->addAnimation(yRotationAnimation);
+        sequential->addAnimation(parallel);
 
         QAbstractTransition *wrongAnswerTransition = d.showAnswerState->addTransition(this, SIGNAL(wrongAnswer()), d.wrongAnswerState);
         wrongAnswerTransition->addAnimation(sequential);
 
         QAbstractTransition *correctAnswerTransition = d.showAnswerState->addTransition(this, SIGNAL(correctAnswer()), d.correctAnswerState);
         correctAnswerTransition->addAnimation(sequential);
+
+        connect(sequential, SIGNAL(finished()), this, SLOT(clearActiveFrame()));
+    }
+
+    {
+        d.correctAnswerState->addTransition(this, SIGNAL(normalState()), d.normalState);
+        d.wrongAnswerState->addTransition(this, SIGNAL(normalState()), d.normalState);
     }
 
     d.stateMachine.setInitialState(d.normalState);
@@ -409,7 +422,7 @@ bool GraphicsScene::load(QIODevice *device)
 //    TopicItem *topic = 0;
     int lineNumber = 0;
     QRegExp commentRegexp("^ *#");
-    FrameItem *frame = 0;
+    Item *frame = 0;
     while (!ts.atEnd()) {
         ++lineNumber;
         const QString line = ts.readLine();
@@ -419,19 +432,19 @@ bool GraphicsScene::load(QIODevice *device)
         case ExpectingTopic:
             if (line.isEmpty())
                 continue;
-            frame = new FrameItem(0, d.frames.size());
+            frame = new Item(0, d.frames.size());
+            frame->setFlag(QGraphicsItem::ItemIsSelectable, false);
             frame->setBackgroundColor(Qt::darkBlue);
             frame->setTextColor(Qt::yellow);
             frame->setText(line);
             addItem(frame);
-            d.frames.append((QList<FrameItem*>() << frame));
+            d.topics.append(frame);
             state = ExpectingQuestion;
             break;
         case ExpectingQuestion:
             if (line.isEmpty()) {
-                qWarning() << "Didn't expect an empty line here. I was looking for question number";
-//                           << (d.frames.last().size() + 1) << "for" << topic->text() << "on line" << lineNumber;
-                // ### fix up
+                qWarning() << "Didn't expect an empty line here. I was looking question number"
+                           << (d.frames.size() % 5) << "for" << d.topics.last()->text() << "on line" << lineNumber;
                 reset();
                 return false;
             } else {
@@ -442,20 +455,20 @@ bool GraphicsScene::load(QIODevice *device)
                     reset();
                     return false;
                 }
-                const int count = d.frames.last().size();
-                const int row = count + 1;
-                const int col = d.frames.size() - 1;
-                frame = new FrameItem(row, col);
+                const int row = d.frames.size() % 5;
+                const int col = d.topics.size() - 1;
+                frame = new Item(row, col);
+                frame->setFlag(QGraphicsItem::ItemIsSelectable, true);
                 frame->setBackgroundColor(Qt::blue);
                 frame->setTextColor(Qt::white);
-                frame->setValue((row) * 100);
+                frame->setValue((row + 1) * 100);
                 frame->setQuestion(split.value(0));
                 frame->setAnswer(split.value(1));
                 frame->setText(frame->valueString());
 
                 addItem(frame);
-                d.frames.last().append(frame);
-                if (count == 5)
+                d.frames.append(frame);
+                if (row == 4)
                     state = ExpectingTopic;
             }
             break;
@@ -474,20 +487,22 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rect)
     d.showQuestionState->assignProperty(&d.proxy, "geometry", ::raisedGeometry(sceneRect()));
 
     d.sceneRectChangedBlocked = true;
-    const int cols = d.frames.size();
-    const int rows = d.frames.value(0).size();
-    for (int x=0; x<cols; ++x) {
-        const QList<FrameItem*> &frames = d.frames.at(x);
-        for (int y=0; y<rows; ++y) {
-            FrameItem *frame = frames.at(y);
-            QRectF r;
-            if (frame == d.proxy.activeFrame()) {
-                r = ::raisedGeometry(rect);
-            } else {
-                r = ::itemGeometry(y, x, rows, cols, rect);
-            }
-            frame->setGeometry(r);
+    const int cols = d.topics.size();
+    static const int rows = 5;
+    for (int i=0; i<cols; ++i)
+        d.topics.at(i)->setGeometry(::itemGeometry(0, i, rows, cols, rect));
+
+    for (int i=0; i<rows * cols; ++i) {
+        Item *frame = d.frames.at(i);
+        QRectF r;
+        if (frame == d.proxy.activeFrame()) {
+            r = ::raisedGeometry(rect);
+        } else {
+            const int y = i % rows;
+            const int x = i / rows;
+            r = ::itemGeometry(y + 1, x, rows, cols, rect);
         }
+        frame->setGeometry(r);
     }
     d.sceneRectChangedBlocked = false;
 }
@@ -503,15 +518,12 @@ void GraphicsScene::keyPressEvent(QKeyEvent *e)
 
 }
 
-QRectF GraphicsScene::itemGeometry(FrameItem *item) const
+QRectF GraphicsScene::itemGeometry(Item *item) const
 {
-    return ::itemGeometry(item->d.row, item->d.column,
-                          d.frames.value(0).size(),
-                          d.frames.size(),
-                          sceneRect());
+    return ::itemGeometry(item->d.row + 1, item->d.column, 5, d.topics.size(), sceneRect());
 }
 
-void GraphicsScene::click(FrameItem *frame)
+void GraphicsScene::click(Item *frame)
 {
     if (!d.proxy.activeFrame()) {
         setupStateMachine(frame);
@@ -523,22 +535,25 @@ void GraphicsScene::click(FrameItem *frame)
 
 void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
-    FrameItem *frame = qgraphicsitem_cast<FrameItem*>(itemAt(event->scenePos()));
-    if (frame && frame->row() != 0) {
+    Item *frame = qgraphicsitem_cast<Item*>(itemAt(event->scenePos()));
+    if (frame && frame->flags() & QGraphicsItem::ItemIsSelectable) {
         click(frame);
     }
 }
 
-void GraphicsScene::setupStateMachine(FrameItem *frame)
+void GraphicsScene::setupStateMachine(Item *frame)
 {
     Q_ASSERT(frame);
     d.proxy.setActiveFrame(frame);
-    d.normalState->assignProperty(&d.proxy, "geometry", itemGeometry(frame));
+    const QRectF r = itemGeometry(frame);
+    d.normalState->assignProperty(&d.proxy, "geometry", r);
     d.normalState->assignProperty(&d.proxy, "text", frame->valueString());
     d.showQuestionState->assignProperty(&d.proxy, "text", frame->question());
     d.showAnswerState->assignProperty(&d.proxy, "text", frame->answer());
     d.correctAnswerState->assignProperty(&d.proxy, "text", QString("%1 is the answer :-)").arg(frame->answer()));
+    d.correctAnswerState->assignProperty(&d.proxy, "geometry", r);
     d.wrongAnswerState->assignProperty(&d.proxy, "text", QString("%1 is the answer :-(").arg(frame->answer()));
+    d.wrongAnswerState->assignProperty(&d.proxy, "geometry", r);
 }
 
 int GraphicsScene::answerTime() const
@@ -546,7 +561,11 @@ int GraphicsScene::answerTime() const
     return d.answerTime;
 }
 
-void GraphicsScene::onCorrectAnswer()
+void GraphicsScene::clearActiveFrame()
 {
-    qDebug("%s %d: void GraphicsScene::onCorrectAnswer()", __FILE__, __LINE__);
+    Q_ASSERT(d.proxy.activeFrame());
+    d.proxy.activeFrame()->setFlag(QGraphicsItem::ItemIsSelectable, false);
+    // ### add/remove score here
+    d.proxy.setActiveFrame(0);
+    emit normalState();
 }

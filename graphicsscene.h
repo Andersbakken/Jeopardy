@@ -4,11 +4,11 @@
 #include <QtGui>
 
 class GraphicsScene;
-class FrameItem : public QGraphicsWidget
+class Item : public QGraphicsWidget
 {
     Q_OBJECT
 public:
-    FrameItem(int row, int col);
+    Item(int row, int col);
     enum { Type = QGraphicsItem::UserType + 2 };
     virtual int type() const { return Type; }
     void setValue(int value);
@@ -79,8 +79,8 @@ public:
     QRectF geometry() const { return d.activeFrame ? d.activeFrame->geometry() : QRectF(); }
     void setGeometry(const QRectF &tt) { if (d.activeFrame) d.activeFrame->setGeometry(tt); }
 
-    FrameItem *activeFrame() const { return d.activeFrame; }
-    void setActiveFrame(FrameItem *frame)
+    Item *activeFrame() const { return d.activeFrame; }
+    void setActiveFrame(Item *frame)
     {
         if (d.activeFrame) {
             d.activeFrame->setZValue(0);
@@ -92,7 +92,7 @@ public:
     }
 private:
     struct Data {
-        FrameItem *activeFrame;
+        Item *activeFrame;
     } d;
 };
 
@@ -113,24 +113,28 @@ public:
     bool load(const QString &file) { QFile f(file); return f.open(QIODevice::ReadOnly) && load(&f); }
     void reset();
     void keyPressEvent(QKeyEvent *e);
-    QRectF itemGeometry(FrameItem *item) const;
+    QRectF itemGeometry(Item *item) const;
     void mousePressEvent(QGraphicsSceneMouseEvent *event);
-    void click(FrameItem *frame);
-    void setupStateMachine(FrameItem *frame);
+    void click(Item *frame);
+    void setupStateMachine(Item *frame);
     int answerTime() const;
 signals:
+    void normalState();
+    void spaceBarPressed();
     void correctAnswer();
     void wrongAnswer();
     void showQuestion();
     void showAnswer();
 public slots:
-    void onCorrectAnswer();
+    void clearActiveFrame();
     void onSceneRectChanged(const QRectF &rect);
 private:
     struct Data {
         QStateMachine stateMachine;
-        QState *normalState, *showQuestionState, *showAnswerState, *correctAnswerState, *wrongAnswerState;
-        QList<QList<FrameItem*> > frames;
+        QState *normalState, *showQuestionState, *showAnswerState, *answerState,
+            *correctAnswerState, *wrongAnswerState;
+
+        QList<Item*> topics, frames;
         bool sceneRectChangedBlocked;
         Proxy proxy;
         int answerTime;
