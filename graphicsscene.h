@@ -8,41 +8,74 @@ class Item : public QGraphicsWidget
 {
     Q_OBJECT
 public:
-    Item(int row, int col);
-    enum { Type = QGraphicsItem::UserType + 2 };
+    Item();
+    enum { Type = QGraphicsItem::UserType + 1 };
     virtual int type() const { return Type; }
-    void setValue(int value);
-    int value() const;
-    QString valueString() const;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = 0);
-    QString question() const;
-    void setQuestion(const QString &question);
-    QString answer() const;
-    void setAnswer(const QString &answer);
     qreal yRotation() const;
     void setYRotation(qreal yy);
-    qreal answerProgress() const;
-    void setAnswerProgress(qreal answerProgress);
-    QColor progressBarColor() const;
-    void setProgressBarColor(const QColor &color);
     void setText(const QString &text);
     QString text() const;
     void setBackgroundColor(const QColor &color);
     QColor backgroundColor() const;
     void setTextColor(const QColor &color);
     QColor textColor() const;
-    int row() const;
-    int column() const;
-private:
     GraphicsScene *graphicsScene() const;
+    virtual void mousePressEvent(QGraphicsSceneMouseEvent *event);
+    virtual void draw(QPainter *, const QRect &) {}
+signals:
+    void clicked(Item *item, const QPointF &scenePos);
+private:
     struct Data {
-        QString text, question, answer, valueString;
-        int value;
-        qreal yRotation, answerProgress;
-        int row, column;
-        QColor backgroundColor, textColor, progressBarColor;
+        QString text;
+        qreal yRotation;
+        QColor backgroundColor, textColor;
     } d;
-    friend class GraphicsScene;
+};
+
+class Frame : public Item
+{
+    Q_OBJECT
+public:
+    Frame(int row, int column);
+    enum { Type = QGraphicsItem::UserType + 2 };
+    virtual int type() const { return Type; }
+
+    int row() const { return d.row; }
+    int column() const { return d.column; }
+
+    void setValue(int value) { d.value = value; d.valueString = QString("%1$").arg(d.value); }
+    int value() const { return d.value; }
+    QString valueString() const { return d.valueString; }
+
+    qreal answerProgress() const { return d.answerProgress; }
+    void setAnswerProgress(qreal answerProgress) { d.answerProgress = answerProgress; update(); }
+    QColor progressBarColor() const { return d.progressBarColor; }
+    void setProgressBarColor(const QColor &color) { d.progressBarColor = color; update(); }
+
+    QString question() const { return d.question; }
+    void setQuestion(const QString &question) { d.question = question; }
+    QString answer() const { return d.answer; }
+    void setAnswer(const QString &answer) { d.answer = answer; }
+
+    virtual void draw(QPainter *, const QRect &);
+private:
+    struct Data {
+        QString question, answer, valueString;
+        int value;
+        qreal answerProgress;
+        int row, column;
+        QColor progressBarColor;
+    } d;
+};
+
+class Team : public Item
+{
+    Q_OBJECT
+public:
+    enum { Type = QGraphicsItem::UserType + 3 };
+    virtual int type() const { return Type; }
+    Team(const QString &name) : Item() { setText(name); }
 };
 
 class Proxy : public QObject
@@ -55,6 +88,7 @@ class Proxy : public QObject
     Q_PROPERTY(QColor backgroundColor READ backgroundColor WRITE setBackgroundColor)
     Q_PROPERTY(QColor textColor READ textColor WRITE setTextColor)
     Q_PROPERTY(QColor progressBarColor READ progressBarColor WRITE setProgressBarColor)
+    Q_PROPERTY(bool activeFrame READ hasActiveFrame WRITE setActiveFrame)
 public:
     Proxy(QObject *parent = 0) : QObject(parent) { d.activeFrame = 0; }
 
@@ -79,8 +113,8 @@ public:
     QRectF geometry() const { return d.activeFrame ? d.activeFrame->geometry() : QRectF(); }
     void setGeometry(const QRectF &tt) { if (d.activeFrame) d.activeFrame->setGeometry(tt); }
 
-    Item *activeFrame() const { return d.activeFrame; }
-    void setActiveFrame(Item *frame)
+    Frame *activeFrame() const { return d.activeFrame; }
+    void setActiveFrame(Frame *frame)
     {
         if (d.activeFrame) {
             d.activeFrame->setZValue(0);
@@ -90,9 +124,27 @@ public:
             d.activeFrame->setZValue(10);
         }
     }
+
+    bool hasActiveFrame() const { return d.activeFrame; }
+    void setActiveFrame(bool on) { Q_ASSERT(!on); Q_UNUSED(on); setActiveFrame(static_cast<Frame*>(0)); }
 private:
     struct Data {
-        Item *activeFrame;
+        Frame *activeFrame;
+    } d;
+};
+
+class TeamProxy : public QObject
+{
+    Q_OBJECT
+    Q_PROPERTY(qreal opacity READ opacity WRITE setOpacity)
+public:
+    TeamProxy(QObject *parent = 0) : QObject(parent) {}
+    void setTeams(const QList<Team*> &teams) { d.teams = teams; }
+    qreal opacity() const { return d.teams.isEmpty() ? 0.0 : d.teams.at(0)->opacity(); }
+    void setOpacity(qreal opacity) { foreach(Item *team, d.teams) team->setOpacity(opacity); }
+private:
+    struct Data {
+        QList<Team*> teams;
     } d;
 };
 
@@ -113,10 +165,9 @@ public:
     bool load(const QString &file) { QFile f(file); return f.open(QIODevice::ReadOnly) && load(&f); }
     void reset();
     void keyPressEvent(QKeyEvent *e);
-    QRectF itemGeometry(Item *item) const;
-    void mousePressEvent(QGraphicsSceneMouseEvent *event);
-    void click(Item *frame);
-    void setupStateMachine(Item *frame);
+    QRectF frameGeometry(Frame *frame) const;
+    void click(Frame *frame);
+    void setupStateMachine(Frame *frame);
     int answerTime() const;
 signals:
     void normalState();
@@ -125,19 +176,25 @@ signals:
     void wrongAnswer();
     void showQuestion();
     void showAnswer();
+    void teamClicked();
 public slots:
+    void onClicked(Item *item);
     void clearActiveFrame();
     void onSceneRectChanged(const QRectF &rect);
 private:
     struct Data {
         QStateMachine stateMachine;
-        QState *normalState, *showQuestionState, *showAnswerState, *answerState,
-            *correctAnswerState, *wrongAnswerState;
+        QState *normalState, *showQuestionState, *showAnswerState, *pickTeamState,
+            *answerState, *correctAnswerState, *wrongAnswerState;
 
-        QList<Item*> topics, frames;
+        QList<Item*> topics;
+        QList<Frame*> frames;
+        QList<Team*> teams;
         bool sceneRectChangedBlocked;
         Proxy proxy;
+        TeamProxy teamProxy;
         int answerTime;
+        Team *currentTeam;
     } d;
 };
 
