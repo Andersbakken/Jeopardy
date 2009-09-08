@@ -23,24 +23,24 @@ public:
     void setYRotation(qreal yy);
     qreal answerProgress() const;
     void setAnswerProgress(qreal answerProgress);
+    QColor progressBarColor() const;
+    void setProgressBarColor(const QColor &color);
     void setText(const QString &text);
     QString text() const;
-    virtual void resizeEvent(QGraphicsSceneResizeEvent *event);
     void setBackgroundColor(const QColor &color);
     QColor backgroundColor() const;
+    void setTextColor(const QColor &color);
+    QColor textColor() const;
     int row() const;
     int column() const;
 private:
-    void updateProgressBarGeometry();
     GraphicsScene *graphicsScene() const;
     struct Data {
         QString text, question, answer, valueString;
         int value;
         qreal yRotation, answerProgress;
         int row, column;
-        QGraphicsProxyWidget *answerProgressBarProxy;
-        QProgressBar *answerProgressBar;
-        QColor backgroundColor;
+        QColor backgroundColor, textColor, progressBarColor;
     } d;
     friend class GraphicsScene;
 };
@@ -53,6 +53,8 @@ class Proxy : public QObject
     Q_PROPERTY(QRectF geometry READ geometry WRITE setGeometry)
     Q_PROPERTY(qreal answerProgress READ answerProgress WRITE setAnswerProgress)
     Q_PROPERTY(QColor backgroundColor READ backgroundColor WRITE setBackgroundColor)
+    Q_PROPERTY(QColor textColor READ textColor WRITE setTextColor)
+    Q_PROPERTY(QColor progressBarColor READ progressBarColor WRITE setProgressBarColor)
 public:
     Proxy(QObject *parent = 0)
         : QObject(parent)
@@ -82,6 +84,18 @@ public:
             d.activeFrame->setText(tt);
     }
 
+    QColor progressBarColor() const
+    {
+        return d.activeFrame ? d.activeFrame->progressBarColor() : QColor();
+    }
+
+    void setProgressBarColor(const QColor &tt)
+    {
+        qDebug() << tt;
+        if (d.activeFrame)
+            d.activeFrame->setProgressBarColor(tt);
+    }
+
     QColor backgroundColor() const
     {
         return d.activeFrame ? d.activeFrame->backgroundColor() : QColor();
@@ -91,6 +105,18 @@ public:
     {
         if (d.activeFrame)
             d.activeFrame->setBackgroundColor(tt);
+    }
+
+
+    QColor textColor() const
+    {
+        return d.activeFrame ? d.activeFrame->textColor() : QColor();
+    }
+
+    void setTextColor(const QColor &tt)
+    {
+        if (d.activeFrame)
+            d.activeFrame->setTextColor(tt);
     }
 
     QRectF geometry() const

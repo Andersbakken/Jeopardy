@@ -1,7 +1,5 @@
 #include "graphicsscene.h"
 
-enum { TimeOut = 7000 };
-
 static inline QRectF itemGeometry(int row, int column, int rows, int columns, const QRectF &sceneRect)
 {
     if (qMin(rows, columns) <= 0)
@@ -96,17 +94,10 @@ private:
 FrameItem::FrameItem(int row, int column)
 {
     d.answerProgress = 0;
-    d.answerProgressBarProxy = 0;
-    d.answerProgressBar = 0;
     d.row = row;
     d.column = column;
 //    setCacheMode(ItemCoordinateCache); // ### need this to know when it's reversed
     d.value = 0;
-}
-
-QColor FrameItem::backgroundColor() const
-{
-    return d.backgroundColor;
 }
 
 int FrameItem::row() const
@@ -119,25 +110,37 @@ int FrameItem::column() const
     return d.column;
 }
 
+QColor FrameItem::backgroundColor() const
+{
+    return d.backgroundColor;
+}
+
 void FrameItem::setBackgroundColor(const QColor &color)
 {
     d.backgroundColor = color;
     update();
 }
 
-void FrameItem::resizeEvent(QGraphicsSceneResizeEvent *event)
+QColor FrameItem::progressBarColor() const
 {
-    QGraphicsWidget::resizeEvent(event);
-    updateProgressBarGeometry();
+    return d.progressBarColor;
 }
 
-void FrameItem::updateProgressBarGeometry()
+void FrameItem::setProgressBarColor(const QColor &color)
 {
-    if (d.answerProgressBarProxy) {
-        QRectF r(QPointF(), QSizeF(rect().width(), d.answerProgressBar->sizeHint().height()));
-        r.moveBottomLeft(rect().bottomLeft());
-        d.answerProgressBarProxy->setGeometry(r);
-    }
+    d.progressBarColor = color;
+    update();
+}
+
+QColor FrameItem::textColor() const
+{
+    return d.textColor;
+}
+
+void FrameItem::setTextColor(const QColor &color)
+{
+    d.textColor = color;
+    update();
 }
 
 void FrameItem::setValue(int value)
@@ -193,27 +196,8 @@ qreal FrameItem::answerProgress() const
 void FrameItem::setAnswerProgress(qreal answerProgress)
 {
     d.answerProgress = answerProgress;
-    if (qFuzzyIsNull(d.answerProgress)) {
-        delete d.answerProgressBar;
-        d.answerProgressBar = 0;
-        delete d.answerProgressBarProxy;
-        d.answerProgressBarProxy = 0;
-    } else {
-
-        if (!d.answerProgressBar) {
-            d.answerProgressBar = new QProgressBar;
-            d.answerProgressBar->setRange(0, graphicsScene()->answerTime());
-            d.answerProgressBar->setTextVisible(true);
-            d.answerProgressBarProxy = new QGraphicsProxyWidget(this);
-            d.answerProgressBarProxy->setWidget(d.answerProgressBar);
-            updateProgressBarGeometry();
-        }
-        d.answerProgressBar->setValue(answerProgress * d.answerProgressBar->maximum());
-        d.answerProgress = answerProgress;
-    }
-
+    update();
 }
-
 
 void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
 {
@@ -224,9 +208,20 @@ void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
         mirrored = true;
         brush = Qt::black;
     }
-    qDrawShadePanel(painter, option->rect, palette(), false, 5, &brush);
+    enum { Margin = 5, PenWidth = 3 };
+    qDrawShadePanel(painter, option->rect, palette(), false, Margin, &brush);
+    if (!qFuzzyIsNull(d.answerProgress) && !qFuzzyCompare(d.answerProgress, 1.0)) {
+        painter->setPen(QPen(Qt::black, PenWidth));
+        const qreal adjust = Margin + (PenWidth / 2);
+        QRectF r = option->rect.adjusted(adjust, 0, -adjust, -adjust);
+        r.setWidth(r.width() * d.answerProgress);
+        r.setTop(option->rect.bottom() - qBound(10, option->rect.height() / 4, 30));
+        painter->setBrush(d.progressBarColor);
+        painter->drawRect(r);
+    }
     if (!mirrored) {
-        painter->setPen(Qt::white);
+        Q_ASSERT(d.textColor.isValid());
+        painter->setPen(d.textColor);
         enum { Margin = 6 } ;
         const QRectF r = option->rect.adjusted(Margin, Margin, -Margin, -Margin);
         QTextLayout layout(d.text);
@@ -236,7 +231,6 @@ void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
         layout.draw(painter, r.center() - textRect.center());
     }
 }
-
 
 QString FrameItem::question() const
 {
@@ -286,18 +280,20 @@ GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
     d.answerTime = 5000;
-    d.normalState = d.showQuestionState = d.showAnswerState = d.correctAnswerState = d.wrongAnswerState = 0;
     d.sceneRectChangedBlocked = false;
 
     d.normalState = new QState(&d.stateMachine);
     d.normalState->setObjectName("normalState");
     d.normalState->assignProperty(&d.proxy, "yRotation", 0.0);
     d.normalState->assignProperty(&d.proxy, "answerProgress", 0.0);
+    d.normalState->assignProperty(&d.proxy, "progressBarColor", Qt::green);
+
 
     d.showQuestionState = new QState(&d.stateMachine);
     d.showQuestionState->setObjectName("showQuestionState");
     d.showQuestionState->assignProperty(&d.proxy, "yRotation", 360.0);
     d.showQuestionState->assignProperty(&d.proxy, "answerProgress", 1.0);
+    d.showQuestionState->assignProperty(&d.proxy, "progressBarColor", Qt::red);
 
     d.showAnswerState = new QState(&d.stateMachine);
     d.showAnswerState->assignProperty(&d.proxy, "backgroundColor", Qt::blue);
@@ -305,46 +301,84 @@ GraphicsScene::GraphicsScene(QObject *parent)
 
     d.wrongAnswerState = new QState(&d.stateMachine);
     d.wrongAnswerState->assignProperty(&d.proxy, "backgroundColor", Qt::red);
+    d.wrongAnswerState->assignProperty(&d.proxy, "yRotation", 0.0);
+    d.wrongAnswerState->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.wrongAnswerState->setObjectName("wrongAnswerState");
 
     d.correctAnswerState = new QState(&d.stateMachine);
     d.correctAnswerState->assignProperty(&d.proxy, "backgroundColor", Qt::green);
+    d.correctAnswerState->assignProperty(&d.proxy, "yRotation", 0.0);
+    d.correctAnswerState->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.correctAnswerState->setObjectName("correctAnswerState");
 
     enum { Duration = 1000 };
-    QSequentialAnimationGroup *group = new QSequentialAnimationGroup(&d.stateMachine);
-    QParallelAnimationGroup *parallel = new QParallelAnimationGroup;
-    QPropertyAnimation *propertyAnimation;
-    parallel->addAnimation(propertyAnimation = new QPropertyAnimation(&d.proxy, "geometry"));
-    propertyAnimation->setDuration(Duration);
-    parallel->addAnimation(propertyAnimation = new QPropertyAnimation(&d.proxy, "yRotation"));
-    propertyAnimation->setDuration(Duration);
-    group->addAnimation(parallel);
-    group->addPause(500);
-    TextAnimation *textAnimation = new TextAnimation(&d.proxy, "text");
-    textAnimation->setDuration(Duration);
-    group->addAnimation(textAnimation);
+    {
+        QSequentialAnimationGroup *sequential = new QSequentialAnimationGroup(&d.stateMachine);
+        QParallelAnimationGroup *parallel = new QParallelAnimationGroup;
+        QPropertyAnimation *geometryAnimation = new QPropertyAnimation(&d.proxy, "geometry");
+        geometryAnimation->setDuration(Duration);
+        parallel->addAnimation(geometryAnimation);
+        QPropertyAnimation *yRotationAnimation = new QPropertyAnimation(&d.proxy, "yRotation");
+        yRotationAnimation->setDuration(Duration);
+        parallel->addAnimation(yRotationAnimation);
+        sequential->addAnimation(parallel);
+        sequential->addPause(500);
+        TextAnimation *textAnimation = new TextAnimation(&d.proxy, "text");
+        textAnimation->setDuration(Duration);
+        sequential->addAnimation(textAnimation);
 
-    group->addAnimation(propertyAnimation = new QPropertyAnimation(&d.proxy, "answerProgress"));
-    propertyAnimation->setDuration(d.answerTime);
+        QParallelAnimationGroup *answerProgressGroup = new QParallelAnimationGroup;
+        QPropertyAnimation *answerProgressAnimation = new QPropertyAnimation(&d.proxy, "answerProgress");
+        answerProgressAnimation->setDuration(d.answerTime);
+        answerProgressGroup->addAnimation(answerProgressAnimation);
 
-    QPropertyAnimation *backgroundColorAnimation = new QPropertyAnimation(&d.proxy, "backgroundColor");
-    backgroundColorAnimation->setDuration(Duration);
-//    d.stateMachine.addDefaultAnimation(backgroundColorAnimation);
+        QPropertyAnimation *progressBarColorAnimation = new QPropertyAnimation(&d.proxy, "progressBarColor");
+        answerProgressAnimation->setDuration(d.answerTime);
+        answerProgressGroup->addAnimation(progressBarColorAnimation);
 
-    QAbstractTransition *transition = d.normalState->addTransition(this, SIGNAL(showQuestion()), d.showQuestionState);
-    transition->addAnimation(group);
+        sequential->addAnimation(answerProgressGroup);
 
-    transition = d.showQuestionState->addTransition(this, SIGNAL(showAnswer()), d.showAnswerState);
-    connect(group, SIGNAL(finished()), this, SIGNAL(showAnswer()));
-    transition->addAnimation(textAnimation);
-    transition = d.showAnswerState->addTransition(this, SIGNAL(wrongAnswer()), d.wrongAnswerState);
-    transition->addAnimation(propertyAnimation);
+        QAbstractTransition *showQuestionTransition = d.normalState->addTransition(this, SIGNAL(showQuestion()), d.showQuestionState);
+        showQuestionTransition->addAnimation(sequential);
+        connect(sequential, SIGNAL(finished()), this, SIGNAL(showAnswer()));
+    }
 
-    transition = d.showAnswerState->addTransition(this, SIGNAL(correctAnswer()), d.correctAnswerState);
-    transition->addAnimation(backgroundColorAnimation);
+    {
+        QAbstractTransition *showAnswerTransition = d.showQuestionState->addTransition(this, SIGNAL(showAnswer()), d.showAnswerState);
+        TextAnimation *textAnimation = new TextAnimation(&d.proxy, "text");
+        textAnimation->setDuration(Duration);
+        showAnswerTransition->addAnimation(textAnimation);
+    }
 
-//    transition->addAnimation(textAnimation);
+    {
+        QSequentialAnimationGroup *sequential = new QSequentialAnimationGroup(&d.stateMachine);
+
+        QPropertyAnimation *backgroundColorAnimation = new QPropertyAnimation(&d.proxy, "backgroundColor");
+        backgroundColorAnimation->setDuration(Duration);
+        sequential->addAnimation(backgroundColorAnimation);
+
+        TextAnimation *textAnimation = new TextAnimation(&d.proxy, "text");
+        textAnimation->setDuration(Duration / 2);
+        sequential->addAnimation(textAnimation);
+
+        sequential->addPause(500);
+
+        QParallelAnimationGroup *parallel = new QParallelAnimationGroup;
+
+        QPropertyAnimation *geometryAnimation = new QPropertyAnimation(&d.proxy, "geometry");
+        geometryAnimation->setDuration(Duration);
+        parallel->addAnimation(geometryAnimation);
+
+        QPropertyAnimation *yRotationAnimation = new QPropertyAnimation(&d.proxy, "yRotation");
+        yRotationAnimation->setDuration(Duration);
+        parallel->addAnimation(yRotationAnimation);
+
+        QAbstractTransition *wrongAnswerTransition = d.showAnswerState->addTransition(this, SIGNAL(wrongAnswer()), d.wrongAnswerState);
+        wrongAnswerTransition->addAnimation(sequential);
+
+        QAbstractTransition *correctAnswerTransition = d.showAnswerState->addTransition(this, SIGNAL(correctAnswer()), d.correctAnswerState);
+        correctAnswerTransition->addAnimation(sequential);
+    }
 
     d.stateMachine.setInitialState(d.normalState);
     d.stateMachine.start();
@@ -376,6 +410,7 @@ bool GraphicsScene::load(QIODevice *device)
                 continue;
             frame = new FrameItem(0, d.frames.size());
             frame->setBackgroundColor(Qt::darkBlue);
+            frame->setTextColor(Qt::yellow);
             frame->setText(line);
             addItem(frame);
             d.frames.append((QList<FrameItem*>() << frame));
@@ -401,6 +436,7 @@ bool GraphicsScene::load(QIODevice *device)
                 const int col = d.frames.size() - 1;
                 frame = new FrameItem(row, col);
                 frame->setBackgroundColor(Qt::blue);
+                frame->setTextColor(Qt::white);
                 frame->setValue((row) * 100);
                 frame->setQuestion(split.value(0));
                 frame->setAnswer(split.value(1));
@@ -490,6 +526,8 @@ void GraphicsScene::setupStateMachine(FrameItem *frame)
     d.normalState->assignProperty(&d.proxy, "text", frame->valueString());
     d.showQuestionState->assignProperty(&d.proxy, "text", frame->question());
     d.showAnswerState->assignProperty(&d.proxy, "text", frame->answer());
+    d.correctAnswerState->assignProperty(&d.proxy, "text", QString("%1 is the answer :-)").arg(frame->answer()));
+    d.correctAnswerState->assignProperty(&d.proxy, "text", QString("%1 is the answer :-(").arg(frame->answer()));
 }
 
 
