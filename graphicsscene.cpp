@@ -109,6 +109,16 @@ QColor FrameItem::backgroundColor() const
     return d.backgroundColor;
 }
 
+int FrameItem::row() const
+{
+    return d.row;
+}
+
+int FrameItem::column() const
+{
+    return d.column;
+}
+
 void FrameItem::setBackgroundColor(const QColor &color)
 {
     d.backgroundColor = color;
@@ -276,7 +286,6 @@ GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
     d.answerTime = 5000;
-    d.activeFrame = 0;
     d.normalState = d.showQuestionState = d.showAnswerState = d.correctAnswerState = d.wrongAnswerState = 0;
     d.sceneRectChangedBlocked = false;
 
@@ -291,7 +300,16 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.showQuestionState->assignProperty(&d.proxy, "answerProgress", 1.0);
 
     d.showAnswerState = new QState(&d.stateMachine);
+    d.showAnswerState->assignProperty(&d.proxy, "backgroundColor", Qt::blue);
     d.showAnswerState->setObjectName("showAnswerState");
+
+    d.wrongAnswerState = new QState(&d.stateMachine);
+    d.wrongAnswerState->assignProperty(&d.proxy, "backgroundColor", Qt::red);
+    d.wrongAnswerState->setObjectName("wrongAnswerState");
+
+    d.correctAnswerState = new QState(&d.stateMachine);
+    d.correctAnswerState->assignProperty(&d.proxy, "backgroundColor", Qt::green);
+    d.correctAnswerState->setObjectName("correctAnswerState");
 
     enum { Duration = 1000 };
     QSequentialAnimationGroup *group = new QSequentialAnimationGroup(&d.stateMachine);
@@ -310,11 +328,24 @@ GraphicsScene::GraphicsScene(QObject *parent)
     group->addAnimation(propertyAnimation = new QPropertyAnimation(&d.proxy, "answerProgress"));
     propertyAnimation->setDuration(d.answerTime);
 
+    QPropertyAnimation *backgroundColorAnimation = new QPropertyAnimation(&d.proxy, "backgroundColor");
+    backgroundColorAnimation->setDuration(Duration);
+//    d.stateMachine.addDefaultAnimation(backgroundColorAnimation);
+
     QAbstractTransition *transition = d.normalState->addTransition(this, SIGNAL(showQuestion()), d.showQuestionState);
     transition->addAnimation(group);
+
     transition = d.showQuestionState->addTransition(this, SIGNAL(showAnswer()), d.showAnswerState);
+    connect(group, SIGNAL(finished()), this, SIGNAL(showAnswer()));
     transition->addAnimation(textAnimation);
-//    connect(d.raisedState, SIGNAL(polished()), this, SIGNAL(showQuestion()));
+    transition = d.showAnswerState->addTransition(this, SIGNAL(wrongAnswer()), d.wrongAnswerState);
+    transition->addAnimation(propertyAnimation);
+
+    transition = d.showAnswerState->addTransition(this, SIGNAL(correctAnswer()), d.correctAnswerState);
+    transition->addAnimation(backgroundColorAnimation);
+
+//    transition->addAnimation(textAnimation);
+
     d.stateMachine.setInitialState(d.normalState);
     d.stateMachine.start();
 }
@@ -435,16 +466,18 @@ QRectF GraphicsScene::itemGeometry(FrameItem *item) const
 
 void GraphicsScene::click(FrameItem *frame)
 {
-    if (!d.activeFrame) {
+    if (!d.proxy.activeFrame()) {
         setupStateMachine(frame);
         emit showQuestion();
+    } else {
+        emit correctAnswer();
     }
 }
 
 void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
     FrameItem *frame = qgraphicsitem_cast<FrameItem*>(itemAt(event->scenePos()));
-    if (frame) {
+    if (frame && frame->row() != 0) {
         click(frame);
     }
 }
@@ -465,3 +498,7 @@ int GraphicsScene::answerTime() const
     return d.answerTime;
 }
 
+void GraphicsScene::onCorrectAnswer()
+{
+    qDebug("%s %d: void GraphicsScene::onCorrectAnswer()", __FILE__, __LINE__);
+}

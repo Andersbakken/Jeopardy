@@ -28,6 +28,8 @@ public:
     virtual void resizeEvent(QGraphicsSceneResizeEvent *event);
     void setBackgroundColor(const QColor &color);
     QColor backgroundColor() const;
+    int row() const;
+    int column() const;
 private:
     void updateProgressBarGeometry();
     GraphicsScene *graphicsScene() const;
@@ -50,6 +52,7 @@ class Proxy : public QObject
     Q_PROPERTY(QString text READ text WRITE setText)
     Q_PROPERTY(QRectF geometry READ geometry WRITE setGeometry)
     Q_PROPERTY(qreal answerProgress READ answerProgress WRITE setAnswerProgress)
+    Q_PROPERTY(QColor backgroundColor READ backgroundColor WRITE setBackgroundColor)
 public:
     Proxy(QObject *parent = 0)
         : QObject(parent)
@@ -77,6 +80,17 @@ public:
     {
         if (d.activeFrame)
             d.activeFrame->setText(tt);
+    }
+
+    QColor backgroundColor() const
+    {
+        return d.activeFrame ? d.activeFrame->backgroundColor() : QColor();
+    }
+
+    void setBackgroundColor(const QColor &tt)
+    {
+        if (d.activeFrame)
+            d.activeFrame->setBackgroundColor(tt);
     }
 
     QRectF geometry() const
@@ -149,6 +163,7 @@ signals:
     void showQuestion();
     void showAnswer();
 public slots:
+    void onCorrectAnswer();
     void onSceneRectChanged(const QRectF &rect);
 private:
     struct Data {
@@ -156,7 +171,6 @@ private:
         QState *normalState, *showQuestionState, *showAnswerState, *correctAnswerState, *wrongAnswerState;
         QList<QList<FrameItem*> > frames;
         bool sceneRectChangedBlocked;
-        FrameItem *activeFrame;
         Proxy proxy;
         int answerTime;
     } d;
