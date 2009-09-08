@@ -41,6 +41,8 @@ public:
     void setText(const QString &text);
     QString text() const;
     virtual void resizeEvent(QGraphicsSceneResizeEvent *event);
+    void setBackgroundColor(const QColor &color);
+    QColor backgroundColor() const;
 private:
     void updateProgressBarGeometry();
     GraphicsScene *graphicsScene() const;
@@ -51,6 +53,7 @@ private:
         int row, column;
         QGraphicsProxyWidget *answerProgressBarProxy;
         QProgressBar *answerProgressBar;
+        QColor backgroundColor;
     } d;
     friend class GraphicsScene;
 };
@@ -162,15 +165,11 @@ signals:
     void showAnswer();
 public slots:
     void onSceneRectChanged(const QRectF &rect);
-    void onFrameRaised();
-    void onFrameLowered();
 private:
     struct Data {
         QStateMachine stateMachine;
         QState *normalState, *showQuestionState, *showAnswerState, *correctAnswerState, *wrongAnswerState;
-        FrameItem *raised;
-        QList<TopicItem*> topicItems;
-        QList<QList<FrameItem*> > frameItems;
+        QList<QList<FrameItem*> > frames;
         bool sceneRectChangedBlocked;
         FrameItem *activeFrame;
         Proxy proxy;

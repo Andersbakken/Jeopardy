@@ -129,6 +129,17 @@ FrameItem::FrameItem(int row, int column)
     d.value = 0;
 }
 
+QColor FrameItem::backgroundColor() const
+{
+    return d.backgroundColor;
+}
+
+void FrameItem::setBackgroundColor(const QColor &color)
+{
+    d.backgroundColor = color;
+    update();
+}
+
 void FrameItem::resizeEvent(QGraphicsSceneResizeEvent *event)
 {
     QGraphicsWidget::resizeEvent(event);
@@ -291,7 +302,6 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.answerTime = 5000;
     d.activeFrame = 0;
     d.normalState = d.showQuestionState = d.showAnswerState = d.correctAnswerState = d.wrongAnswerState = 0;
-    d.raised = 0;
     d.sceneRectChangedBlocked = false;
 
     d.normalState = new QState(&d.stateMachine);
@@ -344,9 +354,10 @@ bool GraphicsScene::load(QIODevice *device)
     } state = ExpectingTopic;
 
 
-    TopicItem *topic = 0;
+//    TopicItem *topic = 0;
     int lineNumber = 0;
     QRegExp commentRegexp("^ *#");
+    FrameItem *frame = 0;
     while (!ts.atEnd()) {
         ++lineNumber;
         const QString line = ts.readLine();
@@ -356,16 +367,17 @@ bool GraphicsScene::load(QIODevice *device)
         case ExpectingTopic:
             if (line.isEmpty())
                 continue;
-            topic = new TopicItem(line);
-            addItem(topic);
-            d.frameItems.append(QList<FrameItem*>());
-            d.topicItems.append(topic);
+            frame = new FrameItem(0, d.frames.size());
+            frame->setText(line);
+            addItem(frame);
+            d.frames.append((QList<FrameItem*>() << frame));
             state = ExpectingQuestion;
             break;
         case ExpectingQuestion:
             if (line.isEmpty()) {
-                qWarning() << "Didn't expect an empty line here. I was looking for question number"
-                           << (d.frameItems.last().size() + 1) << "for" << topic->text() << "on line" << lineNumber;
+                qWarning() << "Didn't expect an empty line here. I was looking for question number";
+//                           << (d.frames.last().size() + 1) << "for" << topic->text() << "on line" << lineNumber;
+                // ### fix up
                 reset();
                 return false;
             } else {
@@ -376,17 +388,17 @@ bool GraphicsScene::load(QIODevice *device)
                     reset();
                     return false;
                 }
-                const int count = d.frameItems.last().size();
+                const int count = d.frames.last().size();
                 const int row = count + 1;
-                const int col = d.topicItems.size() - 1;
-                FrameItem *frame = new FrameItem(row, col);
+                const int col = d.frames.size() - 1;
+                frame = new FrameItem(row, col);
                 frame->setValue((row) * 100);
                 frame->setQuestion(split.value(0));
                 frame->setAnswer(split.value(1));
                 frame->setText(frame->valueString());
 
                 addItem(frame);
-                d.frameItems.last().append(frame);
+                d.frames.last().append(frame);
                 if (count == 4)
                     state = ExpectingTopic;
             }
@@ -406,19 +418,17 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rect)
     d.showQuestionState->assignProperty(&d.proxy, "geometry", ::raisedGeometry(sceneRect()));
 
     d.sceneRectChangedBlocked = true;
-    const int cols = d.topicItems.size();
-    const int rows = d.frameItems.value(0).size();
+    const int cols = d.frames.size();
+    const int rows = d.frames.value(0).size();
     for (int x=0; x<cols; ++x) {
-        const QRectF r = ::itemGeometry(0, x, rows + 1, cols, rect);
-        d.topicItems.at(x)->setGeometry(r);
-        const QList<FrameItem*> &frames = d.frameItems.at(x);
+        const QList<FrameItem*> &frames = d.frames.at(x);
         for (int y=0; y<rows; ++y) {
             FrameItem *frame = frames.at(y);
             QRectF r;
             if (frame == d.proxy.activeFrame()) {
                 r = ::raisedGeometry(rect);
             } else {
-                r = ::itemGeometry(1 + y, x, rows + 1, cols, rect);
+                r = ::itemGeometry(y, x, rows, cols, rect);
             }
             frame->setGeometry(r);
         }
@@ -429,8 +439,7 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rect)
 void GraphicsScene::reset()
 {
     clear();
-    d.topicItems.clear();
-    d.frameItems.clear();
+    d.frames.clear();
 }
 
 void GraphicsScene::keyPressEvent(QKeyEvent *e)
@@ -441,20 +450,9 @@ void GraphicsScene::keyPressEvent(QKeyEvent *e)
 QRectF GraphicsScene::itemGeometry(FrameItem *item) const
 {
     return ::itemGeometry(item->d.row, item->d.column,
-                          d.frameItems.value(0).size() + 1,
-                          d.topicItems.size(),
+                          d.frames.value(0).size(),
+                          d.frames.size(),
                           sceneRect());
-}
-
-void GraphicsScene::onFrameRaised()
-{
-    d.raised = qobject_cast<FrameItem*>(sender());
-}
-
-void GraphicsScene::onFrameLowered()
-{
-    if (d.raised == qobject_cast<FrameItem*>(sender()))
-        d.raised = 0;
 }
 
 void GraphicsScene::click(FrameItem *frame)
