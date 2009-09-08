@@ -56,91 +56,30 @@ class Proxy : public QObject
     Q_PROPERTY(QColor textColor READ textColor WRITE setTextColor)
     Q_PROPERTY(QColor progressBarColor READ progressBarColor WRITE setProgressBarColor)
 public:
-    Proxy(QObject *parent = 0)
-        : QObject(parent)
-    {
-        d.activeFrame = 0;
-    }
+    Proxy(QObject *parent = 0) : QObject(parent) { d.activeFrame = 0; }
 
-    qreal yRotation() const
-    {
-        return d.activeFrame ? d.activeFrame->yRotation() : qreal(0.0);
-    }
+    qreal yRotation() const { return d.activeFrame ? d.activeFrame->yRotation() : qreal(0.0); }
+    void setYRotation(qreal yy) { if (d.activeFrame) d.activeFrame->setYRotation(yy); }
 
-    void setYRotation(qreal yy)
-    {
-        if (d.activeFrame)
-            d.activeFrame->setYRotation(yy);
-    }
+    QString text() const { return d.activeFrame ? d.activeFrame->text() : QString(); }
+    void setText(const QString &tt) { if (d.activeFrame) d.activeFrame->setText(tt); }
 
-    QString text() const
-    {
-        return d.activeFrame ? d.activeFrame->text() : QString();
-    }
+    QColor progressBarColor() const { return d.activeFrame ? d.activeFrame->progressBarColor() : QColor(); }
+    void setProgressBarColor(const QColor &tt) { if (d.activeFrame) d.activeFrame->setProgressBarColor(tt); }
 
-    void setText(const QString &tt)
-    {
-        if (d.activeFrame)
-            d.activeFrame->setText(tt);
-    }
+    QColor backgroundColor() const { return d.activeFrame ? d.activeFrame->backgroundColor() : QColor(); }
+    void setBackgroundColor(const QColor &tt) { if (d.activeFrame) d.activeFrame->setBackgroundColor(tt); }
 
-    QColor progressBarColor() const
-    {
-        return d.activeFrame ? d.activeFrame->progressBarColor() : QColor();
-    }
+    QColor textColor() const { return d.activeFrame ? d.activeFrame->textColor() : QColor(); }
+    void setTextColor(const QColor &tt) { if (d.activeFrame) d.activeFrame->setTextColor(tt); }
 
-    void setProgressBarColor(const QColor &tt)
-    {
-        qDebug() << tt;
-        if (d.activeFrame)
-            d.activeFrame->setProgressBarColor(tt);
-    }
+    qreal answerProgress() const { return d.activeFrame ? d.activeFrame->answerProgress() : qreal(0.0); }
+    void setAnswerProgress(qreal yy) { if (d.activeFrame) d.activeFrame->setAnswerProgress(yy); }
 
-    QColor backgroundColor() const
-    {
-        return d.activeFrame ? d.activeFrame->backgroundColor() : QColor();
-    }
+    QRectF geometry() const { return d.activeFrame ? d.activeFrame->geometry() : QRectF(); }
+    void setGeometry(const QRectF &tt) { if (d.activeFrame) d.activeFrame->setGeometry(tt); }
 
-    void setBackgroundColor(const QColor &tt)
-    {
-        if (d.activeFrame)
-            d.activeFrame->setBackgroundColor(tt);
-    }
-
-
-    QColor textColor() const
-    {
-        return d.activeFrame ? d.activeFrame->textColor() : QColor();
-    }
-
-    void setTextColor(const QColor &tt)
-    {
-        if (d.activeFrame)
-            d.activeFrame->setTextColor(tt);
-    }
-
-    QRectF geometry() const
-    {
-        return d.activeFrame ? d.activeFrame->geometry() : QRectF();
-    }
-
-    void setGeometry(const QRectF &tt)
-    {
-        if (d.activeFrame)
-            d.activeFrame->setGeometry(tt);
-    }
-
-    qreal answerProgress() const
-    {
-        return d.activeFrame ? d.activeFrame->answerProgress() : qreal(0.0);
-    }
-
-    void setAnswerProgress(qreal yy)
-    {
-        if (d.activeFrame)
-            d.activeFrame->setAnswerProgress(yy);
-    }
-
+    FrameItem *activeFrame() const { return d.activeFrame; }
     void setActiveFrame(FrameItem *frame)
     {
         if (d.activeFrame) {
@@ -150,10 +89,6 @@ public:
         if (d.activeFrame) {
             d.activeFrame->setZValue(10);
         }
-    }
-    FrameItem *activeFrame() const
-    {
-        return d.activeFrame;
     }
 private:
     struct Data {

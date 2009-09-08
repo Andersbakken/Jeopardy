@@ -98,6 +98,7 @@ FrameItem::FrameItem(int row, int column)
     d.column = column;
 //    setCacheMode(ItemCoordinateCache); // ### need this to know when it's reversed
     d.value = 0;
+    d.yRotation = 0;
 }
 
 int FrameItem::row() const
@@ -179,7 +180,10 @@ void FrameItem::setYRotation(qreal yRotation)
 {
     d.yRotation = yRotation;
     QTransform transform;
+    const QRectF r = rect();
+    transform.translate(r.width() / 2, r.height() / 2);
     transform.rotate(yRotation, Qt::YAxis);
+    transform.translate(-r.width() / 2, -r.height() / 2);
     setTransform(transform);
 }
 
@@ -226,7 +230,7 @@ void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
         const QRectF r = option->rect.adjusted(Margin, Margin, -Margin, -Margin);
         QTextLayout layout(d.text);
         ::initTextLayout(&layout, r, r.height() / 5);
-        painter->setPen(Qt::white);
+        painter->setPen(d.textColor);
         const QRectF textRect = layout.boundingRect();
         layout.draw(painter, r.center() - textRect.center());
     }
@@ -286,27 +290,29 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.normalState->setObjectName("normalState");
     d.normalState->assignProperty(&d.proxy, "yRotation", 0.0);
     d.normalState->assignProperty(&d.proxy, "answerProgress", 0.0);
-    d.normalState->assignProperty(&d.proxy, "progressBarColor", Qt::green);
-
+    d.normalState->assignProperty(&d.proxy, "progressBarColor", Qt::yellow);
 
     d.showQuestionState = new QState(&d.stateMachine);
     d.showQuestionState->setObjectName("showQuestionState");
     d.showQuestionState->assignProperty(&d.proxy, "yRotation", 360.0);
     d.showQuestionState->assignProperty(&d.proxy, "answerProgress", 1.0);
-    d.showQuestionState->assignProperty(&d.proxy, "progressBarColor", Qt::red);
+    d.showQuestionState->assignProperty(&d.proxy, "progressBarColor", Qt::green);
 
     d.showAnswerState = new QState(&d.stateMachine);
     d.showAnswerState->assignProperty(&d.proxy, "backgroundColor", Qt::blue);
+    d.showAnswerState->assignProperty(&d.proxy, "progressBarColor", Qt::red);
     d.showAnswerState->setObjectName("showAnswerState");
 
     d.wrongAnswerState = new QState(&d.stateMachine);
     d.wrongAnswerState->assignProperty(&d.proxy, "backgroundColor", Qt::red);
+    d.wrongAnswerState->assignProperty(&d.proxy, "textColor", Qt::black);
     d.wrongAnswerState->assignProperty(&d.proxy, "yRotation", 0.0);
     d.wrongAnswerState->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.wrongAnswerState->setObjectName("wrongAnswerState");
 
     d.correctAnswerState = new QState(&d.stateMachine);
     d.correctAnswerState->assignProperty(&d.proxy, "backgroundColor", Qt::green);
+    d.correctAnswerState->assignProperty(&d.proxy, "textColor", Qt::black);
     d.correctAnswerState->assignProperty(&d.proxy, "yRotation", 0.0);
     d.correctAnswerState->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.correctAnswerState->setObjectName("correctAnswerState");
@@ -353,9 +359,14 @@ GraphicsScene::GraphicsScene(QObject *parent)
     {
         QSequentialAnimationGroup *sequential = new QSequentialAnimationGroup(&d.stateMachine);
 
+        QParallelAnimationGroup *colorGroup = new QParallelAnimationGroup;
         QPropertyAnimation *backgroundColorAnimation = new QPropertyAnimation(&d.proxy, "backgroundColor");
         backgroundColorAnimation->setDuration(Duration);
-        sequential->addAnimation(backgroundColorAnimation);
+        colorGroup->addAnimation(backgroundColorAnimation);
+        QPropertyAnimation *textColorAnimation = new QPropertyAnimation(&d.proxy, "textColor");
+        textColorAnimation->setDuration(Duration);
+        colorGroup->addAnimation(textColorAnimation);
+        sequential->addAnimation(colorGroup);
 
         TextAnimation *textAnimation = new TextAnimation(&d.proxy, "text");
         textAnimation->setDuration(Duration / 2);
@@ -527,9 +538,8 @@ void GraphicsScene::setupStateMachine(FrameItem *frame)
     d.showQuestionState->assignProperty(&d.proxy, "text", frame->question());
     d.showAnswerState->assignProperty(&d.proxy, "text", frame->answer());
     d.correctAnswerState->assignProperty(&d.proxy, "text", QString("%1 is the answer :-)").arg(frame->answer()));
-    d.correctAnswerState->assignProperty(&d.proxy, "text", QString("%1 is the answer :-(").arg(frame->answer()));
+    d.wrongAnswerState->assignProperty(&d.proxy, "text", QString("%1 is the answer :-(").arg(frame->answer()));
 }
-
 
 int GraphicsScene::answerTime() const
 {
