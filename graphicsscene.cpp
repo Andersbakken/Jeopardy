@@ -22,6 +22,9 @@ static inline QRectF raisedGeometry(const QRectF &sceneRect)
 static inline void initTextLayout(QTextLayout *layout, const QRectF &rect, int pixelSize)
 {
     layout->setCacheEnabled(true);
+    QTextOption option;
+    option.setAlignment(Qt::AlignCenter);
+    layout->setTextOption(option);
     forever {
         layout->clearLayout();
         QFont f;
@@ -219,7 +222,8 @@ void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
         QTextLayout layout(d.text);
         ::initTextLayout(&layout, r, r.height() / 5);
         painter->setPen(Qt::white);
-        layout.draw(painter, QPointF());
+        const QRectF textRect = layout.boundingRect();
+        layout.draw(painter, r.center() - textRect.center());
     }
 }
 
