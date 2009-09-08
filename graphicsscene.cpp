@@ -90,34 +90,6 @@ private:
     QGraphicsWidget *widget;
 };
 
-TopicItem::TopicItem(const QString &string)
-{
-    d.text = string;
-}
-void TopicItem::setText(const QString &text)
-{
-    d.text = text;
-    update();
-}
-
-QString TopicItem::text() const
-{
-    return d.text;
-}
-
-
-void TopicItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
-{
-    enum { Margin = 6 } ;
-    const QBrush brush = QColor(0x3366ff);
-    qDrawShadePanel(painter, option->rect, palette(), false, Margin / 2, &brush);
-    const QRectF r = option->rect.adjusted(Margin, Margin, -Margin, -Margin);
-    QTextLayout layout(d.text);
-    ::initTextLayout(&layout, r, r.height() / 2);
-    painter->setPen(Qt::white);
-    layout.draw(painter, QPointF());
-}
-
 FrameItem::FrameItem(int row, int column)
 {
     d.answerProgress = 0;
@@ -232,7 +204,7 @@ void FrameItem::setAnswerProgress(qreal answerProgress)
 
 void FrameItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
 {
-    QBrush brush = QColor(0x3366ff);
+    QBrush brush = d.backgroundColor;
     const QTransform &worldTransform = painter->worldTransform();
     bool mirrored = false;
     if (worldTransform.m11() < 0 || worldTransform.m22() < 0) {
@@ -368,6 +340,7 @@ bool GraphicsScene::load(QIODevice *device)
             if (line.isEmpty())
                 continue;
             frame = new FrameItem(0, d.frames.size());
+            frame->setBackgroundColor(Qt::darkBlue);
             frame->setText(line);
             addItem(frame);
             d.frames.append((QList<FrameItem*>() << frame));
@@ -392,6 +365,7 @@ bool GraphicsScene::load(QIODevice *device)
                 const int row = count + 1;
                 const int col = d.frames.size() - 1;
                 frame = new FrameItem(row, col);
+                frame->setBackgroundColor(Qt::blue);
                 frame->setValue((row) * 100);
                 frame->setQuestion(split.value(0));
                 frame->setAnswer(split.value(1));
@@ -399,7 +373,7 @@ bool GraphicsScene::load(QIODevice *device)
 
                 addItem(frame);
                 d.frames.last().append(frame);
-                if (count == 4)
+                if (count == 5)
                     state = ExpectingTopic;
             }
             break;

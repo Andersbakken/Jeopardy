@@ -3,21 +3,6 @@
 
 #include <QtGui>
 
-class TopicItem : public QGraphicsWidget
-{
-public:
-    TopicItem(const QString &string);
-    enum { Type = QGraphicsItem::UserType + 1 };
-    virtual int type() const { return Type; }
-    void setText(const QString &text);
-    QString text() const;
-    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = 0);
-private:
-    struct Data {
-        QString text;
-    } d;
-};
-
 class GraphicsScene;
 class FrameItem : public QGraphicsWidget
 {
