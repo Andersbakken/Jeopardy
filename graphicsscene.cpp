@@ -470,14 +470,14 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rect)
     const QRectF raised = ::raisedGeometry(rect);
 
     for (int i=0; i<rows * cols; ++i) {
-        Item *frame = d.frames.at(i);
+        Frame *frame = d.frames.at(i);
         QRectF r;
         if (frame == d.proxy.activeFrame()) {
             r = raised;
         } else {
             const int y = i % rows;
             const int x = i / rows;
-            r = ::itemGeometry(y + 1, x, rows, cols, rect);
+            r = ::itemGeometry(y + 1, x, rows + 1, cols, rect);
         }
         frame->setGeometry(r);
     }
@@ -518,7 +518,7 @@ void GraphicsScene::keyPressEvent(QKeyEvent *e)
 
 QRectF GraphicsScene::frameGeometry(Frame *frame) const
 {
-    return ::itemGeometry(frame->row() + 1, frame->column(), 5, d.topics.size(), sceneRect());
+    return ::itemGeometry(frame->row() + 1, frame->column(), 6, d.topics.size(), sceneRect());
 }
 
 void GraphicsScene::click(Frame *frame)
