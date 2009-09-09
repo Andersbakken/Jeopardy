@@ -206,7 +206,7 @@ void SelectorItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opti
 GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
-    d.answerTime = 600;
+    d.answerTime = 3000;
     d.sceneRectChangedBlocked = false;
     d.currentTeam = 0;
 
@@ -360,7 +360,7 @@ GraphicsScene::GraphicsScene(QObject *parent)
         sequential->addAnimation(answerProgressAnimation);
         connect(answerProgressAnimation, SIGNAL(finished()), this, SIGNAL(wrongAnswer()));
 
-        QAbstractTransition *answerTransition = d.pickTeamState->addTransition(this, SIGNAL(teamClicked()), d.answerState);
+        QAbstractTransition *answerTransition = d.pickTeamState->addTransition(this, SIGNAL(teamPicked()), d.answerState);
         answerTransition->addAnimation(sequential);
     }
 
@@ -508,6 +508,7 @@ void GraphicsScene::keyPressEvent(QKeyEvent *e)
 {
     switch (e->key()) {
     case Qt::Key_Space:
+        qDebug("%s %d: emit spaceBarPressed();", __FILE__, __LINE__);
         emit spaceBarPressed();
         break;
     default:
@@ -543,7 +544,7 @@ void GraphicsScene::onClicked(Item *item)
 
     if (Team *team = qgraphicsitem_cast<Team*>(item)) {
         d.currentTeam = team;
-        emit teamClicked();
+        emit teamPicked();
     }
 }
 

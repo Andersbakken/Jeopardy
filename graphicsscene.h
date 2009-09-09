@@ -176,7 +176,7 @@ signals:
     void wrongAnswer();
     void showQuestion();
     void showAnswer();
-    void teamClicked();
+    void teamPicked();
 public slots:
     void onClicked(Item *item);
     void clearActiveFrame();
