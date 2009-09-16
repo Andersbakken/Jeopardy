@@ -148,7 +148,6 @@ private:
     } d;
 };
 
-
 class SelectorItem : public QGraphicsWidget
 {
 public:
