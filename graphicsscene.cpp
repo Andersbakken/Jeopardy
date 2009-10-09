@@ -93,9 +93,11 @@ private:
 
 Item::Item()
 {
+    d.hoveredBackgroundColor = Qt::green;
     setAcceptHoverEvents(true);
     setCacheMode(ItemCoordinateCache);
     d.yRotation = 0;
+    d.hovered = false;
 }
 
 void Item::mousePressEvent(QGraphicsSceneMouseEvent *event)
@@ -170,14 +172,14 @@ qreal Item::yRotation() const
     return d.yRotation;
 }
 
-void Item::hoverEnterEvent(QGraphicsSceneHoverEvent *event)
+void Item::hoverEnterEvent(QGraphicsSceneHoverEvent *)
 {
     d.hovered = true;
     if (d.backgroundColor != d.hoveredBackgroundColor)
         update();
 }
 
-void Item::hoverLeaveEvent(QGraphicsSceneHoverEvent *event)
+void Item::hoverLeaveEvent(QGraphicsSceneHoverEvent *)
 {
     d.hovered = false;
     if (d.backgroundColor != d.hoveredBackgroundColor)
@@ -188,14 +190,13 @@ void Item::hoverLeaveEvent(QGraphicsSceneHoverEvent *event)
 
 void Item::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
 {
-    qDebug() << uint(option->state);
 //    const QTransform &worldTransform = painter->worldTransform();
 //     bool mirrored = false;
 //     if (worldTransform.m11() < 0 || worldTransform.m22() < 0) {
 //         mirrored = true;
 //         brush = Qt::black;
 //     }
-    QBrush brush = d.backgroundColor;
+    QBrush brush = d.hovered ? d.hoveredBackgroundColor : d.backgroundColor;
     enum { Margin = 5 };
     qDrawShadePanel(painter, option->rect, palette(), false, Margin, &brush);
     draw(painter, option->rect);
@@ -255,6 +256,7 @@ GraphicsScene::GraphicsScene(QObject *parent)
 
     d.showAnswerState = new QState(&d.stateMachine);
     d.showAnswerState->assignProperty(&d.proxy, "backgroundColor", Qt::blue);
+    d.showAnswerState->assignProperty(&d.proxy, "hoveredBackgroundColor", Qt::red);
     d.showAnswerState->assignProperty(&d.proxy, "progressBarColor", Qt::red);
 //    d.showAnswerState->assignProperty(&d.teamProxy, "opacity", 0.0);
     d.showAnswerState->setObjectName("showAnswerState");
