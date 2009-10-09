@@ -507,6 +507,8 @@ bool GraphicsScene::load(QIODevice *device)
     }
 
     QStringList teams = pickTeams(views().value(0));
+    if (teams.isEmpty())
+        return false;
     for (int i=0; i<teams.size(); ++i) {
         Team *team = new Team(teams.at(i));
         connect(team, SIGNAL(clicked(Item*, QPointF)), this, SLOT(onClicked(Item*)));
