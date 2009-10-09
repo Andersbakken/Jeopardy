@@ -1,4 +1,3 @@
-#include <QtGui>
 #include "graphicsview.h"
 #include "graphicsscene.h"
 
@@ -48,5 +47,18 @@ void GraphicsView::newGame()
             setScene(scene);
             d.scene->setSceneRect(rect());
         }
+    }
+}
+
+void GraphicsView::mouseDoubleClickEvent(QMouseEvent *e)
+{
+    if (!d.scene) {
+        d.scene = new GraphicsScene(this);
+        d.scene->load(":/questions.txt", QStringList() << "Team 1" << "Team 2");
+        setBackgroundBrush(QBrush());
+        d.scene->setSceneRect(rect());
+        setScene(d.scene);
+    } else {
+        QGraphicsView::mouseDoubleClickEvent(e);
     }
 }

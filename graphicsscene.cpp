@@ -421,7 +421,7 @@ static QStringList pickTeams(QWidget *parent)
     return ret;
 }
 
-bool GraphicsScene::load(QIODevice *device)
+bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
 {
     reset();
     disconnect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(onSceneRectChanged(QRectF)));
@@ -430,7 +430,6 @@ bool GraphicsScene::load(QIODevice *device)
         ExpectingTopic,
         ExpectingQuestion
     } state = ExpectingTopic;
-
 
 //    TopicItem *topic = 0;
     int lineNumber = 0;
@@ -491,9 +490,10 @@ bool GraphicsScene::load(QIODevice *device)
         }
     }
 
-    QStringList teams = pickTeams(views().value(0));
-    if (teams.isEmpty())
+    const QStringList teams = (tms.isEmpty() ? pickTeams(views().value(0)) : tms);
+    if (teams.isEmpty()) {
         return false;
+    }
     for (int i=0; i<teams.size(); ++i) {
         Team *team = new Team(teams.at(i));
         connect(team, SIGNAL(clicked(Item*, QPointF)), this, SLOT(onClicked(Item*)));

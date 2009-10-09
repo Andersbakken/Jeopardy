@@ -1,8 +1,7 @@
 #ifndef GRAPHICSVIEW_H
 #define GRAPHICSVIEW_H
 
-#include <QGraphicsView>
-#include <QWidget>
+#include <QtGui>
 class GraphicsScene;
 class GraphicsView : public QGraphicsView
 {
@@ -11,6 +10,7 @@ public:
     GraphicsView(QGraphicsScene *scene = 0, QWidget *parent = 0);
     void resizeEvent(QResizeEvent *);
     QSize sizeHint() const;
+    void mouseDoubleClickEvent(QMouseEvent *e);
 public slots:
     void newGame();
 private:

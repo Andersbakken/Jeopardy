@@ -20,3 +20,4 @@ unix {
     UI_DIR=tmp/ui
     OBJECTS_DIR=tmp/obj
 }
+RESOURCES += jeopardy.qrc

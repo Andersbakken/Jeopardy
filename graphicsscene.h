@@ -174,7 +174,7 @@ class GraphicsScene : public QGraphicsScene
     Q_OBJECT
 public:
     GraphicsScene(QObject *parent = 0);
-    bool load(QIODevice *device);
+    bool load(QIODevice *device, const QStringList &teams);
     void reset();
     void keyPressEvent(QKeyEvent *e);
     void mousePressEvent(QGraphicsSceneMouseEvent *e);
@@ -192,7 +192,8 @@ signals:
     void teamPicked();
     void mouseButtonPressed(const QPointF &, Qt::MouseButton);
 public slots:
-    bool load(const QString &file) { QFile f(file); return f.open(QIODevice::ReadOnly) && load(&f); }
+    bool load(const QString &file, const QStringList &teams = QStringList())
+    { QFile f(file); return f.open(QIODevice::ReadOnly) && load(&f, teams); }
     void onClicked(Item *item);
     void clearActiveFrame();
     void onSceneRectChanged(const QRectF &rect);
