@@ -18,10 +18,8 @@ public:
     QString text() const;
     void setBackgroundColor(const QColor &color);
     QColor backgroundColor() const;
-    void setHoveredBackgroundColor(const QColor &color);
-    QColor hoveredBackgroundColor() const;
-    void setTextColor(const QColor &color);
-    QColor textColor() const;
+    void setColor(const QColor &color);
+    QColor color() const;
     GraphicsScene *graphicsScene() const;
     virtual void mousePressEvent(QGraphicsSceneMouseEvent *event);
     virtual void draw(QPainter *, const QRect &) {}
@@ -35,7 +33,7 @@ private:
         QString text;
         qreal yRotation;
         bool hovered;
-        QColor backgroundColor, textColor, hoveredBackgroundColor;
+        QColor backgroundColor, color;
     } d;
 };
 
@@ -102,8 +100,7 @@ class Proxy : public QObject
     Q_PROPERTY(QRectF geometry READ geometry WRITE setGeometry)
     Q_PROPERTY(qreal answerProgress READ answerProgress WRITE setAnswerProgress)
     Q_PROPERTY(QColor backgroundColor READ backgroundColor WRITE setBackgroundColor)
-    Q_PROPERTY(QColor hoveredBackgroundColor READ hoveredBackgroundColor WRITE setHoveredBackgroundColor)
-    Q_PROPERTY(QColor textColor READ textColor WRITE setTextColor)
+    Q_PROPERTY(QColor color READ color WRITE setColor)
     Q_PROPERTY(QColor progressBarColor READ progressBarColor WRITE setProgressBarColor)
     Q_PROPERTY(bool activeFrame READ hasActiveFrame WRITE setActiveFrame)
 public:
@@ -121,11 +118,8 @@ public:
     QColor backgroundColor() const { return d.activeFrame ? d.activeFrame->backgroundColor() : QColor(); }
     void setBackgroundColor(const QColor &tt) { if (d.activeFrame) d.activeFrame->setBackgroundColor(tt); }
 
-    QColor hoveredBackgroundColor() const { return d.activeFrame ? d.activeFrame->hoveredBackgroundColor() : QColor(); }
-    void setHoveredBackgroundColor(const QColor &tt) { if (d.activeFrame) d.activeFrame->setHoveredBackgroundColor(tt); }
-
-    QColor textColor() const { return d.activeFrame ? d.activeFrame->textColor() : QColor(); }
-    void setTextColor(const QColor &tt) { if (d.activeFrame) d.activeFrame->setTextColor(tt); }
+    QColor color() const { return d.activeFrame ? d.activeFrame->color() : QColor(); }
+    void setColor(const QColor &tt) { if (d.activeFrame) d.activeFrame->setColor(tt); }
 
     qreal answerProgress() const { return d.activeFrame ? d.activeFrame->answerProgress() : qreal(0.0); }
     void setAnswerProgress(qreal yy) { if (d.activeFrame) d.activeFrame->setAnswerProgress(yy); }
@@ -212,6 +206,7 @@ private:
         QList<Item*> topics;
         QList<Frame*> frames;
         QList<Team*> teams;
+        QRectF teamsGeometry, framesGeometry;
         bool sceneRectChangedBlocked;
         Proxy proxy;
         TeamProxy teamProxy;

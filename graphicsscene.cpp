@@ -93,7 +93,6 @@ private:
 
 Item::Item()
 {
-    d.hoveredBackgroundColor = Qt::green;
     setAcceptHoverEvents(true);
     setCacheMode(ItemCoordinateCache);
     d.yRotation = 0;
@@ -118,25 +117,14 @@ void Item::setBackgroundColor(const QColor &color)
     update();
 }
 
-QColor Item::hoveredBackgroundColor() const
+QColor Item::color() const
 {
-    return d.hoveredBackgroundColor;
+    return d.color;
 }
 
-void Item::setHoveredBackgroundColor(const QColor &color)
+void Item::setColor(const QColor &color)
 {
-    d.hoveredBackgroundColor = color;
-    update();
-}
-
-QColor Item::textColor() const
-{
-    return d.textColor;
-}
-
-void Item::setTextColor(const QColor &color)
-{
-    d.textColor = color;
+    d.color = color;
     update();
 }
 
@@ -175,15 +163,13 @@ qreal Item::yRotation() const
 void Item::hoverEnterEvent(QGraphicsSceneHoverEvent *)
 {
     d.hovered = true;
-    if (d.backgroundColor != d.hoveredBackgroundColor)
-        update();
+    update();
 }
 
 void Item::hoverLeaveEvent(QGraphicsSceneHoverEvent *)
 {
     d.hovered = false;
-    if (d.backgroundColor != d.hoveredBackgroundColor)
-        update();
+    update();
 }
 
 
@@ -196,16 +182,16 @@ void Item::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWid
 //         mirrored = true;
 //         brush = Qt::black;
 //     }
-    QBrush brush = d.hovered ? d.hoveredBackgroundColor : d.backgroundColor;
+    QBrush brush = d.hovered ? d.color : d.backgroundColor;
     enum { Margin = 5 };
     qDrawShadePanel(painter, option->rect, palette(), false, Margin, &brush);
     draw(painter, option->rect);
-    Q_ASSERT(d.textColor.isValid());
-    painter->setPen(d.textColor);
+    Q_ASSERT(d.color.isValid());
+    painter->setPen(d.color);
     const QRectF r = option->rect.adjusted(Margin, Margin, -Margin, -Margin);
     QTextLayout layout(d.text);
     ::initTextLayout(&layout, r, r.height() / 5);
-    painter->setPen(d.textColor);
+    painter->setPen(d.hovered ? d.backgroundColor : d.color);
     const QRectF textRect = layout.boundingRect();
     layout.draw(painter, r.center() - textRect.center());
 }
@@ -256,7 +242,6 @@ GraphicsScene::GraphicsScene(QObject *parent)
 
     d.showAnswerState = new QState(&d.stateMachine);
     d.showAnswerState->assignProperty(&d.proxy, "backgroundColor", Qt::blue);
-    d.showAnswerState->assignProperty(&d.proxy, "hoveredBackgroundColor", Qt::red);
     d.showAnswerState->assignProperty(&d.proxy, "progressBarColor", Qt::red);
 //    d.showAnswerState->assignProperty(&d.teamProxy, "opacity", 0.0);
     d.showAnswerState->setObjectName("showAnswerState");
@@ -269,21 +254,21 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.answerState = new QState(&d.stateMachine);
 //    d.answerState->assignProperty(&d.teamProxy, "opacity", 0.0);
     d.answerState->assignProperty(&d.proxy, "backgroundColor", Qt::yellow);
-    d.answerState->assignProperty(&d.proxy, "textColor", Qt::blue);
+    d.answerState->assignProperty(&d.proxy, "color", Qt::blue);
     d.answerState->assignProperty(&d.proxy, "progressBarColor", Qt::red);
     d.answerState->assignProperty(&d.proxy, "answerProgress", 1.0);
     d.answerState->setObjectName("answerState");
 
     d.wrongAnswerState = new QState(&d.stateMachine);
     d.wrongAnswerState->assignProperty(&d.proxy, "backgroundColor", Qt::red);
-    d.wrongAnswerState->assignProperty(&d.proxy, "textColor", Qt::black);
+    d.wrongAnswerState->assignProperty(&d.proxy, "color", Qt::black);
     d.wrongAnswerState->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.wrongAnswerState->assignProperty(&d.proxy, "yRotation", 0.0);
     d.wrongAnswerState->setObjectName("wrongAnswerState");
 
     d.correctAnswerState = new QState(&d.stateMachine);
     d.correctAnswerState->assignProperty(&d.proxy, "backgroundColor", Qt::green);
-    d.correctAnswerState->assignProperty(&d.proxy, "textColor", Qt::black);
+    d.correctAnswerState->assignProperty(&d.proxy, "color", Qt::black);
     d.correctAnswerState->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.correctAnswerState->assignProperty(&d.proxy, "yRotation", 0.0);
     d.correctAnswerState->setObjectName("correctAnswerState");
@@ -336,9 +321,9 @@ GraphicsScene::GraphicsScene(QObject *parent)
         QPropertyAnimation *backgroundColorAnimation = new QPropertyAnimation(&d.proxy, "backgroundColor");
         backgroundColorAnimation->setDuration(Duration);
         colorGroup->addAnimation(backgroundColorAnimation);
-        QPropertyAnimation *textColorAnimation = new QPropertyAnimation(&d.proxy, "textColor");
-        textColorAnimation->setDuration(Duration);
-        colorGroup->addAnimation(textColorAnimation);
+        QPropertyAnimation *colorAnimation = new QPropertyAnimation(&d.proxy, "color");
+        colorAnimation->setDuration(Duration);
+        colorGroup->addAnimation(colorAnimation);
         sequential->addAnimation(colorGroup);
 
         TextAnimation *textAnimation = new TextAnimation(&d.proxy, "text");
@@ -387,9 +372,9 @@ GraphicsScene::GraphicsScene(QObject *parent)
         backgroundColorAnimation->setDuration(Duration);
         parallel->addAnimation(backgroundColorAnimation);
 
-        QPropertyAnimation *textColorAnimation = new QPropertyAnimation(&d.proxy, "textColor");
-        textColorAnimation->setDuration(Duration);
-        parallel->addAnimation(textColorAnimation);
+        QPropertyAnimation *colorAnimation = new QPropertyAnimation(&d.proxy, "color");
+        colorAnimation->setDuration(Duration);
+        parallel->addAnimation(colorAnimation);
         sequential->addAnimation(parallel);
 
         QPropertyAnimation *answerProgressAnimation = new QPropertyAnimation(&d.proxy, "answerProgress");
@@ -465,7 +450,7 @@ bool GraphicsScene::load(QIODevice *device)
             topic = new Item;
             topic->setFlag(QGraphicsItem::ItemIsSelectable, false);
             topic->setBackgroundColor(Qt::darkBlue);
-            topic->setTextColor(Qt::yellow);
+            topic->setColor(Qt::yellow);
             topic->setText(line);
             addItem(topic);
             d.topics.append(topic);
@@ -491,7 +476,7 @@ bool GraphicsScene::load(QIODevice *device)
                 connect(frame, SIGNAL(clicked(Item*, QPointF)), this, SLOT(onClicked(Item*)));
                 frame->setFlag(QGraphicsItem::ItemIsSelectable, true);
                 frame->setBackgroundColor(Qt::blue);
-                frame->setTextColor(Qt::white);
+                frame->setColor(Qt::white);
                 frame->setValue((row + 1) * 100);
                 frame->setQuestion(split.value(0));
                 frame->setAnswer(split.value(1));
@@ -515,7 +500,7 @@ bool GraphicsScene::load(QIODevice *device)
 //        team->setOpacity(0.0);
         team->setZValue(100.0);
         team->setBackgroundColor(Qt::darkGray);
-        team->setTextColor(Qt::white);
+        team->setColor(Qt::white);
         d.teams.append(team);
         addItem(team);
     }
@@ -531,17 +516,19 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rr)
     if (d.sceneRectChangedBlocked || rr.isEmpty())
         return;
 
-    const QRectF rect = rr.adjusted(0, 100, 0, 0);
+    enum { TeamsHeight = 100 };
+    d.teamsGeometry = QRectF(rr.topLeft(), QSize(rr.width(), TeamsHeight));
+    d.framesGeometry = rr.adjusted(0, TeamsHeight, 0, 0);
 
-    d.showQuestionState->assignProperty(&d.proxy, "geometry", ::raisedGeometry(rect));
+    d.showQuestionState->assignProperty(&d.proxy, "geometry", ::raisedGeometry(d.framesGeometry));
 
     d.sceneRectChangedBlocked = true;
     const int cols = d.topics.size();
     static const int rows = 5;
     for (int i=0; i<cols; ++i)
-        d.topics.at(i)->setGeometry(::itemGeometry(0, i, rows, cols, rect));
+        d.topics.at(i)->setGeometry(::itemGeometry(0, i, rows, cols, d.framesGeometry));
 
-    const QRectF raised = ::raisedGeometry(rect);
+    const QRectF raised = ::raisedGeometry(d.framesGeometry);
 
     for (int i=0; i<rows * cols; ++i) {
         Frame *frame = d.frames.at(i);
@@ -551,14 +538,15 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rr)
         } else {
             const int y = i % rows;
             const int x = i / rows;
-            r = ::itemGeometry(y + 1, x, rows + 1, cols, rect);
+            r = ::itemGeometry(y + 1, x, rows + 1, cols, d.framesGeometry);
         }
         frame->setGeometry(r);
     }
 
     Q_ASSERT(!d.teams.isEmpty());
     enum { Margin = 2 };
-    QRectF r(0, 0, (rr.width() / d.teams.size()) - Margin, rect.top());
+    QRectF r = d.teamsGeometry;
+    r.setWidth((d.teamsGeometry.width() / d.teams.size()) - Margin);
     for (int i=0; i<d.teams.size(); ++i) {
         d.teams.at(i)->setGeometry(r);
         r.translate(r.width() + Margin, 0);
@@ -597,7 +585,7 @@ void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *e)
 
 QRectF GraphicsScene::frameGeometry(Frame *frame) const
 {
-    return ::itemGeometry(frame->row() + 1, frame->column(), 6, d.topics.size(), sceneRect());
+    return ::itemGeometry(frame->row() + 1, frame->column(), 6, d.topics.size(), d.framesGeometry);
 }
 
 void GraphicsScene::click(Frame *frame)
