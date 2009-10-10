@@ -151,14 +151,18 @@ class TeamProxy : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(qreal opacity READ opacity WRITE setOpacity)
+    Q_PROPERTY(QRectF rect READ rect WRITE setRect)
 public:
     TeamProxy(QObject *parent = 0) : QObject(parent) {}
     void setTeams(const QList<Team*> &teams) { d.teams = teams; }
     qreal opacity() const { return d.teams.isEmpty() ? 0.0 : d.teams.at(0)->opacity(); }
     void setOpacity(qreal opacity) { foreach(Item *team, d.teams) team->setOpacity(opacity); }
+    QRectF rect() const { return d.rect; }
+    void setRect(const QRectF &rect);
 private:
     struct Data {
         QList<Team*> teams;
+        QRectF rect;
     } d;
 };
 
@@ -199,10 +203,22 @@ public slots:
     void onSceneRectChanged(const QRectF &rect);
     void onTransitionTriggered();
 private:
+    enum State {
+        Normal = 0,
+        ShowQuestion,
+        ShowAnswer, // is this right?
+        Timeout,
+        PickTeam,
+        TeamTimedOut,
+        PickRightOrWrong,
+        WrongAnswer,
+        CorrectAnswer,
+        NumStates
+    };
     struct Data {
         QStateMachine stateMachine;
-        QState *normalState, *showQuestionState, *showAnswerState, *pickTeamState,
-            *answerState, *correctAnswerState, *wrongAnswerState;
+
+        QState *states[NumStates];
 
         QList<Item*> topics;
         QList<Frame*> frames;
@@ -213,6 +229,7 @@ private:
         TeamProxy teamProxy;
         int answerTime;
         Team *currentTeam;
+        Item *rightAnswerItem, *wrongAnswerItem;
     } d;
 };
 
