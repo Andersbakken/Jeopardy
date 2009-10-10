@@ -5,81 +5,72 @@ class Object : public QObject
     Q_OBJECT
 public:
     enum StateType {
-        NoState = 0x000,
-        Normal = 0x001,
-        ShowQuestion = 0x002,
-        ShowAnswer = 0x004, // is this right?
-        TimeOut = 0x008,
-        PickTeam = 0x010,
-        TeamTimedOut = 0x020,
-        PickRightOrWrong = 0x040,
-        WrongAnswer = 0x080,
-        RightAnswer = 0x100,
-        Finished = 0x200
+        Normal = 0,
+        ShowQuestion,
+        TimeOut,
+        PickTeam,
+        TeamTimedOut,
+        PickRightOrWrong,
+        WrongAnswer,
+        RightAnswer,
+        Finished,
+        NumStates
     };
 
     Object(QObject *parent = 0)
         : QObject(parent)
     {
+        d.right = d.wrong = d.timedout = 0;
         d.framesLeft = 0;
         d.currentFrame = 0;
         d.currentTeam = 0;
-        struct {
-            const StateType type;
-            const char *name;
-        } const states[] = {
-            { Normal, "Normal" },
-            { ShowQuestion, "ShowQuestion" },
-            { ShowAnswer, "ShowAnswer" },
-            { TimeOut, "TimeOut" },
-            { PickTeam, "PickTeam" },
-            { TeamTimedOut, "TeamTimedOut" },
-            { PickRightOrWrong, "PickRightOrWrong" },
-            { WrongAnswer, "WrongAnswer" },
-            { RightAnswer, "RightAnswer" },
-            { Finished, "Finished" },
-            { NoState, 0 }
+
+        const char *states[] = {
+            "Normal", "ShowQuestion", "TimeOut", "PickTeam",
+            "TeamTimedOut", "PickRightOrWrong", "WrongAnswer",
+            "RightAnswer", "Finished", 0
         };
-        for (int i=0; states[i].type != NoState; ++i) {
+        for (int i=0; states[i]; ++i) {
             QState *state = new QState(&d.stateMachine);
-            state->setProperty("type", states[i].type);
+            state->setProperty("type", i);
             connect(state, SIGNAL(entered()), this, SLOT(onStateEntered()));
             connect(state, SIGNAL(exited()), this, SLOT(onStateExited()));
-            state->setObjectName(states[i].name);
-            d.states[states[i].type] = state;
+            state->setObjectName(states[i]);
+            d.states[i] = state;
         }
 
-        d.states.value(Normal)->addTransition(this, SIGNAL(nextState()),
-                                              d.states.value(ShowQuestion));
-        d.states.value(ShowQuestion)->addTransition(this, SIGNAL(nextStateTimeOut()),
-                                                    d.states[TimeOut]);
-        d.states.value(ShowQuestion)->addTransition(this, SIGNAL(nextState()),
-                                                    d.states[PickTeam]);
-        d.states.value(TimeOut)->addTransition(this, SIGNAL(nextState()),
-                                               d.states.value(Normal));
-        d.states.value(TimeOut)->addTransition(this, SIGNAL(nextStateFinished()),
-                                               d.states.value(Finished));
-        d.states.value(PickTeam)->addTransition(this, SIGNAL(nextStateTimeOut()),
-                                                d.states.value(TeamTimedOut));
-        d.states.value(PickTeam)->addTransition(this, SIGNAL(nextState()),
-                                                d.states.value(PickRightOrWrong));
-        d.states.value(TeamTimedOut)->addTransition(this, SIGNAL(nextState()),
-                                                    d.states.value(ShowQuestion));
-        d.states.value(PickRightOrWrong)->addTransition(this, SIGNAL(nextStateRight()),
-                                                        d.states.value(RightAnswer));
-        d.states.value(PickRightOrWrong)->addTransition(this, SIGNAL(nextStateWrong()),
-                                                        d.states.value(WrongAnswer));
-        d.states.value(RightAnswer)->addTransition(this, SIGNAL(nextState()),
-                                                   d.states.value(Normal));
-        d.states.value(RightAnswer)->addTransition(this, SIGNAL(nextStateFinished()),
-                                                   d.states.value(Finished));
-        d.states.value(WrongAnswer)->addTransition(this, SIGNAL(nextState()),
-                                                   d.states.value(ShowQuestion));
+        d.states[Normal]->addTransition(this, SIGNAL(nextState()),
+                                        d.states[ShowQuestion]);
+        d.states[ShowQuestion]->addTransition(this, SIGNAL(nextStateTimeOut()),
+                                              d.states[TimeOut]);
+        d.states[ShowQuestion]->addTransition(this, SIGNAL(nextState()),
+                                              d.states[PickTeam]);
+        d.states[TimeOut]->addTransition(this, SIGNAL(nextState()),
+                                         d.states[Normal]);
+        d.states[TimeOut]->addTransition(this, SIGNAL(nextStateFinished()),
+                                         d.states[Finished]);
+        d.states[PickTeam]->addTransition(this, SIGNAL(nextStateTimeOut()),
+                                          d.states[TeamTimedOut]);
+        d.states[PickTeam]->addTransition(this, SIGNAL(nextState()),
+                                          d.states[PickRightOrWrong]);
+        d.states[TeamTimedOut]->addTransition(this, SIGNAL(nextState()),
+                                              d.states[ShowQuestion]);
+        d.states[PickRightOrWrong]->addTransition(this, SIGNAL(nextStateRight()),
+                                                  d.states[RightAnswer]);
+        d.states[PickRightOrWrong]->addTransition(this, SIGNAL(nextStateWrong()),
+                                                  d.states[WrongAnswer]);
+        d.states[RightAnswer]->addTransition(this, SIGNAL(nextState()),
+                                             d.states[Normal]);
+        d.states[RightAnswer]->addTransition(this, SIGNAL(nextStateFinished()),
+                                             d.states[Finished]);
+        d.states[WrongAnswer]->addTransition(this, SIGNAL(nextState()),
+                                             d.states[ShowQuestion]);
     }
 
 public slots:
     void newGame()
     {
+        d.right = d.wrong = d.timedout = 0;
         qDeleteAll(d.teams);
         d.teams.clear();
         qDeleteAll(d.frames);
@@ -102,7 +93,7 @@ public slots:
             d.frames.append(frame);
         }
         d.framesLeft = d.frames.size();
-        d.stateMachine.setInitialState(d.states.value(Normal));
+        d.stateMachine.setInitialState(d.states[Normal]);
         d.stateMachine.start();
         QTimer::singleShot(0, this, SLOT(next()));
     }
@@ -119,7 +110,8 @@ public slots:
     void onStateEntered()
     {
         QState *state = qobject_cast<QState*>(sender());
-        switch (state->property("type").toInt()) {
+        const int type = state->property("type").toInt();
+        switch (type) {
         case Normal:
             Q_ASSERT(d.teamsAttempted.isEmpty());
             Q_ASSERT(!d.currentTeam);
@@ -130,8 +122,8 @@ public slots:
                 emit nextStateTimeOut();
             } else {
                 Q_ASSERT(d.currentFrame);
-                qDebug() << "showing question" << d.currentFrame->question
-                         << "worth" << d.currentFrame->value << "$";
+//                 qDebug() << "showing question" << d.currentFrame->question
+//                          << "worth" << d.currentFrame->value << "$";
             }
             break; }
         case TimeOut:
@@ -148,35 +140,40 @@ public slots:
             d.teamsAttempted.insert(d.currentTeam);
             break;
         case TeamTimedOut:
+            ++d.timedout;
         case WrongAnswer:
+            if (type == WrongAnswer)
+                ++d.wrong;
             Q_ASSERT(d.currentTeam);
             Q_ASSERT(d.currentFrame);
             d.currentTeam->score -= d.currentFrame->value / 2;
-            qDebug() << d.currentTeam->name
-                     << (state->property("type").toInt() == TeamTimedOut
-                         ? "Didn't answer in time" : "Answered wrong")
-                     << "They lost" << (d.currentFrame->value / 2) << "$. They now have"
-                     << d.currentTeam->score << "$";
+//             qDebug() << d.currentTeam->name
+//                      << (state->property("type").toInt() == TeamTimedOut
+//                          ? "Didn't answer in time" : "Answered wrong")
+//                      << "They lost" << (d.currentFrame->value / 2) << "$. They now have"
+//                      << d.currentTeam->score << "$";
             d.currentTeam = 0;
             break;
         case RightAnswer:
+            ++d.right;
             Q_ASSERT(d.currentTeam);
             Q_ASSERT(d.currentFrame);
             d.currentTeam->score += d.currentFrame->value;
-            qDebug() << d.currentTeam->name << "answered correctly and earned" << d.currentFrame->value
-                     << "$. They now have" << d.currentTeam->score << "$";
+//             qDebug() << d.currentTeam->name << "answered correctly and earned" << d.currentFrame->value
+//                      << "$. They now have" << d.currentTeam->score << "$";
             finishQuestion();
             break;
         case Finished:
-            qSort(d.teams.begin(), d.teams.end(), compareTeamsByScore);
+            qSort(d.teams.end(), d.teams.begin(), compareTeamsByScore);
             for (int i=0; i<d.teams.size(); ++i) {
                 qDebug() << i << d.teams.at(i)->score << d.teams.at(i)->name;
             }
+            qDebug() << "right" << d.right << "wrong" << d.wrong << "timedout" << d.timedout;
             d.stateMachine.stop();
-            QTimer::singleShot(5000, this, SLOT(newGame()));
+            QTimer::singleShot(500, this, SLOT(newGame()));
             break;
         }
-        qDebug() << sender()->objectName() << "entered";
+//        qDebug() << sender()->objectName() << "entered";
     }
     void onStateExited()
     {
@@ -233,13 +230,14 @@ private:
     };
     struct Data {
         QStateMachine stateMachine;
-        QHash<StateType, QState*> states;
+        QState *states[NumStates];
         QList<Team*> teams;
         QSet<Team*> teamsAttempted;
         Team *currentTeam;
 
         QList<Frame*> frames;
         int framesLeft;
+        int right, wrong, timedout;
 
         Frame *currentFrame;
     } d;
