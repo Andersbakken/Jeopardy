@@ -236,9 +236,11 @@ GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
     memset(d.states, sizeof(QState*) * NumStates, 0);
+
     d.answerTime = 3000;
     d.sceneRectChangedBlocked = false;
     d.currentTeam = 0;
+
 
     d.states[Normal] = new QState(&d.stateMachine);
     d.states[Normal]->setObjectName("normalState");

@@ -1,8 +1,4 @@
-
-
 normal -> showquestion -> timeout -> normal
                        -> pickteam -> teamtimedout -> showquestion
                                    -> pickrightorwrong -> wronganswer -> showquestion
                                                        -> rightanswer -> normal
-
-
