@@ -152,6 +152,8 @@ class TeamProxy : public QObject
     Q_OBJECT
     Q_PROPERTY(qreal opacity READ opacity WRITE setOpacity)
     Q_PROPERTY(QRectF rect READ rect WRITE setRect)
+    Q_PROPERTY(QColor backgroundColor READ backgroundColor WRITE setBackgroundColor)
+    Q_PROPERTY(QColor color READ colorx WRITE setColor)
 public:
     TeamProxy(QObject *parent = 0) : QObject(parent) {}
     void setTeams(const QList<Team*> &teams) { d.teams = teams; }
@@ -159,9 +161,15 @@ public:
     void setOpacity(qreal opacity) { foreach(Item *team, d.teams) team->setOpacity(opacity); }
     QRectF rect() const { return d.rect; }
     void setRect(const QRectF &rect);
+    QColor backgroundColor() const { return d.activeTeam ? d.activeTeam->backgroundColor() : QColor(); }
+    void setBackgroundColor(const QColor &tt) { if (d.activeTeam) d.activeTeam->setBackgroundColor(tt); }
+    QColor color() const { return d.activeTeam ? d.activeTeam->color() : QColor(); }
+    void setColor(const QColor &tt) { if (d.activeTeam) d.activeTeam->setColor(tt); }
+    void setActiveTeam(Team *team) { d.activeTeam = team; }
 private:
     struct Data {
         QList<Team*> teams;
+        Team *activeTeam;
         QRectF rect;
     } d;
 };
@@ -203,25 +211,33 @@ public slots:
     void onSceneRectChanged(const QRectF &rect);
     void onTransitionTriggered();
 private:
-    enum State {
+    enum StateType {
         Normal = 0,
         ShowQuestion,
-        ShowAnswer, // is this right?
-        Timeout,
+        TimeOut,
         PickTeam,
         TeamTimedOut,
         PickRightOrWrong,
         WrongAnswer,
-        CorrectAnswer,
+        RightAnswer,
+        Finished,
         NumStates
     };
+
     struct Data {
         QStateMachine stateMachine;
-
         QState *states[NumStates];
+        QList<Team*> teams;
+        QSet<Team*> teamsAttempted;
+        Team *currentTeam;
+
+        QList<Frame*> frames;
+        int framesLeft;
+        int right, wrong, timedout;
+
+        Frame *currentFrame;
 
         QList<Item*> topics;
-        QList<Frame*> frames;
         QList<Team*> teams;
         QRectF teamsGeometry, framesGeometry;
         bool sceneRectChangedBlocked;

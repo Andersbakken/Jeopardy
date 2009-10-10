@@ -235,55 +235,86 @@ void SelectorItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opti
 GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
-    memset(d.states, sizeof(QState*) * NumStates, 0);
-
-    d.answerTime = 3000;
+    d.answerTime = 0;
     d.sceneRectChangedBlocked = false;
+
+    d.framesLeft = 0;
+    d.currentFrame = 0;
     d.currentTeam = 0;
 
+    const char *states[] = {
+        "Normal", "ShowQuestion", "TimeOut", "PickTeam",
+        "TeamTimedOut", "PickRightOrWrong", "WrongAnswer",
+        "RightAnswer", "Finished", 0
+    };
+    for (int i=0; states[i]; ++i) {
+        QState *state = new QState(&d.stateMachine);
+        state->setProperty("type", i);
+        connect(state, SIGNAL(entered()), this, SLOT(onStateEntered()));
+        connect(state, SIGNAL(exited()), this, SLOT(onStateExited()));
+        state->setObjectName(states[i]);
+        d.states[i] = state;
+    }
 
-    d.states[Normal] = new QState(&d.stateMachine);
-    d.states[Normal]->setObjectName("normalState");
+    d.states[Normal]->addTransition(this, SIGNAL(nextState()), d.states[ShowQuestion]);
+    d.states[ShowQuestion]->addTransition(this, SIGNAL(nextStateTimeOut()),
+                                          d.states[TimeOut]);
+    d.states[ShowQuestion]->addTransition(this, SIGNAL(nextState()),
+                                          d.states[PickTeam]);
+    d.states[TimeOut]->addTransition(this, SIGNAL(nextState()),
+                                     d.states[Normal]);
+    d.states[TimeOut]->addTransition(this, SIGNAL(nextStateFinished()),
+                                     d.states[Finished]);
+    d.states[PickTeam]->addTransition(this, SIGNAL(nextStateTimeOut()),
+                                      d.states[TeamTimedOut]);
+    d.states[PickTeam]->addTransition(this, SIGNAL(nextState()),
+                                      d.states[PickRightOrWrong]);
+    d.states[TeamTimedOut]->addTransition(this, SIGNAL(nextState()),
+                                          d.states[ShowQuestion]);
+    d.states[PickRightOrWrong]->addTransition(this, SIGNAL(nextStateRight()),
+                                              d.states[RightAnswer]);
+    d.states[PickRightOrWrong]->addTransition(this, SIGNAL(nextStateWrong()),
+                                              d.states[WrongAnswer]);
+    d.states[RightAnswer]->addTransition(this, SIGNAL(nextState()),
+                                         d.states[Normal]);
+    d.states[RightAnswer]->addTransition(this, SIGNAL(nextStateFinished()),
+                                         d.states[Finished]);
+    d.states[WrongAnswer]->addTransition(this, SIGNAL(nextState()),
+                                         d.states[ShowQuestion]);
+
     d.states[Normal]->assignProperty(&d.proxy, "yRotation", 0.0);
     d.states[Normal]->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.states[Normal]->assignProperty(&d.proxy, "progressBarColor", Qt::yellow);
 
-    d.states[ShowQuestion] = new QState(&d.stateMachine);
-    d.states[ShowQuestion]->setObjectName("showQuestionState");
     d.states[ShowQuestion]->assignProperty(&d.proxy, "yRotation", 360.0);
     d.states[ShowQuestion]->assignProperty(&d.proxy, "answerProgress", 1.0);
     d.states[ShowQuestion]->assignProperty(&d.proxy, "progressBarColor", Qt::green);
 
-    d.states[ShowAnswer] = new QState(&d.stateMachine);
-    d.states[ShowAnswer]->assignProperty(&d.proxy, "backgroundColor", Qt::blue);
-    d.states[ShowAnswer]->assignProperty(&d.proxy, "progressBarColor", Qt::red);
-//    d.states[ShowAnswer]->assignProperty(&d.teamProxy, "opacity", 0.0);
-    d.states[ShowAnswer]->setObjectName("showAnswerState");
-
-    d.states[PickTeam] = new QState(&d.stateMachine);
 //    d.states[PickTeam]->assignProperty(&d.teamProxy, "opacity", 1.0);
     d.states[PickTeam]->assignProperty(&d.proxy, "answerProgress", 0.0);
-    d.states[PickTeam]->setObjectName("pickTeamState");
 
-    d.states[PickRightOrWrong] = new QState(&d.stateMachine);
     d.states[PickRightOrWrong]->assignProperty(d.rightAnswerItem, "opacity", 1.0);
     d.states[PickRightOrWrong]->assignProperty(d.wrongAnswerItem, "opacity", 1.0);
-    d.states[PickRightOrWrong]->setObjectName("answerState");
 
-    d.states[WrongAnswer] = new QState(&d.stateMachine);
     d.states[WrongAnswer]->assignProperty(&d.proxy, "backgroundColor", Qt::red);
     d.states[WrongAnswer]->assignProperty(&d.proxy, "color", Qt::black);
     d.states[WrongAnswer]->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.states[WrongAnswer]->assignProperty(&d.proxy, "yRotation", 0.0);
-    d.states[WrongAnswer]->setObjectName("states[WrongAnswer]");
+    d.states[WrongAnswer]->assignProperty(d.rightAnswerItem, "opacity", 0.0);
+    d.states[WrongAnswer]->assignProperty(d.wrongAnswerItem, "opacity", 0.0);
 
-    d.states[CorrectAnswer] = new QState(&d.stateMachine);
     d.states[CorrectAnswer]->assignProperty(&d.proxy, "backgroundColor", Qt::green);
     d.states[CorrectAnswer]->assignProperty(&d.proxy, "color", Qt::black);
     d.states[CorrectAnswer]->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.states[CorrectAnswer]->assignProperty(&d.proxy, "yRotation", 0.0);
-    d.states[CorrectAnswer]->setObjectName("states[CorrectAnswer]");
 
+    d.states[TeamTimedOut]->assignProperty(&d.teamProxy, "backgroundColor", Qt::red);
+    d.states[TeamTimedOut]->assignProperty(&d.proxy, "color", Qt::black);
+    d.states[CorrectAnswer]->assignProperty(&d.proxy, "answerProgress", 0.0);
+    d.states[CorrectAnswer]->assignProperty(&d.proxy, "yRotation", 0.0);
+
+
+#if 0
     enum { Duration = 1000 };
     {
         QSequentialAnimationGroup *sequential = new QSequentialAnimationGroup(&d.stateMachine);
@@ -424,6 +455,7 @@ GraphicsScene::GraphicsScene(QObject *parent)
         answerTransition->addAnimation(sequential);
     }
 
+#endif
 
     d.stateMachine.setInitialState(d.states[Normal]);
     d.stateMachine.start();
@@ -539,6 +571,7 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
         team->setZValue(100.0);
         team->setBackgroundColor(Qt::darkGray);
         team->setColor(Qt::white);
+        d.states[Normal]->setProperty(team, "backgroundColor", Qt::darkGray);
         d.teams.append(team);
         addItem(team);
     }
