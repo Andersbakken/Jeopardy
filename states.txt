@@ -1,4 +1,8 @@
 normal -> showquestion -> timeout -> normal
+                                  -> finished
                        -> pickteam -> teamtimedout -> showquestion
                                    -> pickrightorwrong -> wronganswer -> showquestion
                                                        -> rightanswer -> normal
+                                                                      -> finished
+
+### what about if all teams have failed?
