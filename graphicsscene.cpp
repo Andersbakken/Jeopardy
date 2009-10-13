@@ -17,8 +17,6 @@ static inline QRectF raisedGeometry(const QRectF &sceneRect)
                               -sceneRect.width() * adjust, -sceneRect.height() * adjust);
 }
 
-#define FOO(transition) transition->setObjectName(#transition); connect(transition, SIGNAL(triggered()), this, SLOT(onTransitionTriggered()));
-
 GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
@@ -540,4 +538,104 @@ void GraphicsScene::setTeamGeometry(const QRectF &rect)
     }
 }
 
+
+void GraphicsScene::onStateEntered()
+{
+    QState *state = qobject_cast<QState*>(sender());
+    const int type = state->property("type").toInt();
+    switch (type) {
+    case Normal:
+        Q_ASSERT(d.teamsAttempted.isEmpty());
+        Q_ASSERT(!d.currentTeam);
+        Q_ASSERT(!d.currentFrame);
+        break;
+    case ShowQuestion: {
+        if (d.teamsAttempted.size() == d.teams.size()) {
+            emit nextStateTimeOut();
+        } else {
+            Q_ASSERT(d.currentFrame);
+//                 qDebug() << "showing question" << d.currentFrame->question
+//                          << "worth" << d.currentFrame->value << "$";
+        }
+        break; }
+    case TimeOut:
+        Q_ASSERT(d.currentFrame);
+        d.currentFrame->status = Frame::Failed;
+        finishQuestion();
+        break;
+    case PickTeam:
+        Q_ASSERT(!d.currentTeam);
+        Q_ASSERT(d.teamsAttempted.size() < d.teams.size());
+        do {
+            d.currentTeam = d.teams.at(rand() % d.teams.size());
+        } while (d.teamsAttempted.contains(d.currentTeam));
+        d.teamsAttempted.insert(d.currentTeam);
+        break;
+    case TeamTimedOut:
+        ++d.timedout;
+    case WrongAnswer:
+        if (type == WrongAnswer)
+            ++d.wrong;
+        Q_ASSERT(d.currentTeam);
+        Q_ASSERT(d.currentFrame);
+        d.currentTeam->score -= d.currentFrame->value / 2;
+//             qDebug() << d.currentTeam->name
+//                      << (state->property("type").toInt() == TeamTimedOut
+//                          ? "Didn't answer in time" : "Answered wrong")
+//                      << "They lost" << (d.currentFrame->value / 2) << "$. They now have"
+//                      << d.currentTeam->score << "$";
+        d.currentTeam = 0;
+        break;
+    case RightAnswer:
+        ++d.right;
+        Q_ASSERT(d.currentTeam);
+        Q_ASSERT(d.currentFrame);
+        d.currentTeam->score += d.currentFrame->value;
+//             qDebug() << d.currentTeam->name << "answered correctly and earned" << d.currentFrame->value
+//                      << "$. They now have" << d.currentTeam->score << "$";
+        finishQuestion();
+        break;
+    case Finished:
+        qSort(d.teams.end(), d.teams.begin(), compareTeamsByScore);
+        for (int i=0; i<d.teams.size(); ++i) {
+            qDebug() << i << d.teams.at(i)->score << d.teams.at(i)->name;
+        }
+        qDebug() << "right" << d.right << "wrong" << d.wrong << "timedout" << d.timedout;
+        d.stateMachine.stop();
+        QTimer::singleShot(500, this, SLOT(newGame()));
+        break;
+    }
+//        qDebug() << sender()->objectName() << "entered";
+}
+
+void GraphicsScene::onStateExited()
+{
+    QState *state = qobject_cast<QState*>(sender());
+    switch (state->property("type").toInt()) {
+    case Normal: {
+        int idx = rand() % d.frames.size();
+        while (d.frames.at(idx)->status != Frame::Hidden) {
+            if (++idx == d.frames.size())
+                idx = 0;
+        }
+        Q_ASSERT(!d.currentFrame);
+        d.currentFrame = d.frames.at(idx);
+        Q_ASSERT(d.currentFrame->status == Frame::Hidden);
+        --d.framesLeft;
+        break; }
+    default:
+        break;
+    }
+//        qDebug() << sender()->objectName() << "exited";
+}
+
+
+void GraphicsScene::finishQuestion()
+{
+    d.currentFrame = 0;
+    d.teamsAttempted.clear();
+    d.currentTeam = 0;
+    if (d.framesLeft == 0)
+        emit nextStateFinished();
+}
 

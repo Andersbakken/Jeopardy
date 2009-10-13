@@ -27,6 +27,12 @@ signals:
     void showAnswer();
     void teamPicked();
     void mouseButtonPressed(const QPointF &, Qt::MouseButton);
+
+    void nextState();
+    void nextStateWrong();
+    void nextStateRight();
+    void nextStateTimeOut();
+    void nextStateFinished();
 public slots:
     bool load(const QString &file, const QStringList &teams = QStringList())
     { QFile f(file); return f.open(QIODevice::ReadOnly) && load(&f, teams); }
@@ -34,7 +40,10 @@ public slots:
     void clearActiveFrame();
     void onSceneRectChanged(const QRectF &rect);
     void onTransitionTriggered();
+    void onStateEntered();
+    void onStateExited();
 private:
+    void finishQuestion();
     enum StateType {
         Normal = 0,
         ShowQuestion,
