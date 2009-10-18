@@ -40,9 +40,18 @@ class Frame : public Item
 {
     Q_OBJECT
 public:
+    enum Status {
+        Hidden,
+        Failed,
+        Succeeded
+    };
+
     Frame(int row, int column);
     enum { Type = QGraphicsItem::UserType + 2 };
     virtual int type() const { return Type; }
+
+    Status status() const { return d.status; }
+    void setStatus(Status status) { d.status = status; }
 
     int row() const { return d.row; }
     int column() const { return d.column; }
@@ -62,6 +71,8 @@ public:
     void setAnswer(const QString &answer) { d.answer = answer; }
 
     virtual void draw(QPainter *, const QRect &);
+
+
 private:
     struct Data {
         QString question, answer, valueString;
@@ -69,6 +80,7 @@ private:
         qreal answerProgress;
         int row, column;
         QColor progressBarColor;
+        Status status;
     } d;
 };
 

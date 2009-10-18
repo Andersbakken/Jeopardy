@@ -205,6 +205,7 @@ void SelectorItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opti
 Frame::Frame(int row, int column)
     : Item()
 {
+    d.status = Hidden;
     d.row = row;
     d.column = column;
     d.value = 0;

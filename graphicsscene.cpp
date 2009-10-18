@@ -20,6 +20,22 @@ static inline QRectF raisedGeometry(const QRectF &sceneRect)
 GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
+    d.wrongAnswerItem = new Item;
+    d.wrongAnswerItem->setOpacity(0.0);
+    d.wrongAnswerItem->setBackgroundColor(Qt::red);
+    d.wrongAnswerItem->setColor(Qt::black);
+    d.wrongAnswerItem->setText("Wrong!");
+    d.wrongAnswerItem->setZValue(200);
+    addItem(d.wrongAnswerItem);
+
+    d.rightAnswerItem = new Item;
+    d.rightAnswerItem->setBackgroundColor(Qt::green);
+    d.rightAnswerItem->setColor(Qt::black);
+    d.rightAnswerItem->setText("Right!");
+    d.rightAnswerItem->setOpacity(0.0);
+    d.rightAnswerItem->setZValue(200);
+    addItem(d.rightAnswerItem);
+
     d.teamProxy = new TeamProxy(this);
     d.answerTime = 0;
     d.sceneRectChangedBlocked = false;
@@ -363,19 +379,6 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
     }
     d.teamProxy->setTeams(d.teams);
 
-    d.wrongAnswerItem = new Item;
-    d.wrongAnswerItem->setOpacity(0.0);
-    d.wrongAnswerItem->setBackgroundColor(Qt::red);
-    d.wrongAnswerItem->setColor(Qt::black);
-    d.wrongAnswerItem->setText("Wrong!");
-    d.wrongAnswerItem->setZValue(200);
-    d.rightAnswerItem = new Item;
-    d.rightAnswerItem->setBackgroundColor(Qt::green);
-    d.rightAnswerItem->setColor(Qt::black);
-    d.rightAnswerItem->setText("Right!");
-    d.rightAnswerItem->setOpacity(0.0);
-    d.rightAnswerItem->setZValue(200);
-
     onSceneRectChanged(sceneRect());
     connect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(onSceneRectChanged(QRectF)));
     return true;
@@ -434,12 +437,17 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rr)
 void GraphicsScene::reset()
 {
     d.currentTeam = 0;
-    d.rightAnswerItem = d.wrongAnswerItem = 0;
+    Q_ASSERT(d.rightAnswerItem);
+    Q_ASSERT(d.wrongAnswerItem);
+    removeItem(d.rightAnswerItem);
+    removeItem(d.wrongAnswerItem);
     d.sceneRectChangedBlocked = false;
     clear();
     d.frames.clear();
     d.topics.clear();
     d.teams.clear();
+    addItem(d.rightAnswerItem);
+    addItem(d.wrongAnswerItem);
 }
 
 void GraphicsScene::keyPressEvent(QKeyEvent *e)
@@ -537,7 +545,10 @@ void GraphicsScene::setTeamGeometry(const QRectF &rect)
         r.translate(r.width() + Margin, 0);
     }
 }
-
+static inline bool compareTeamsByScore(const Team *left, const Team *right)
+{
+    return left->points() < right->points();
+}
 
 void GraphicsScene::onStateEntered()
 {
@@ -560,7 +571,7 @@ void GraphicsScene::onStateEntered()
         break; }
     case TimeOut:
         Q_ASSERT(d.currentFrame);
-        d.currentFrame->status = Frame::Failed;
+        d.currentFrame->setStatus(Frame::Failed);
         finishQuestion();
         break;
     case PickTeam:
@@ -578,7 +589,7 @@ void GraphicsScene::onStateEntered()
             ++d.wrong;
         Q_ASSERT(d.currentTeam);
         Q_ASSERT(d.currentFrame);
-        d.currentTeam->score -= d.currentFrame->value / 2;
+        d.currentTeam->addPoints(-d.currentFrame->value() / 2);
 //             qDebug() << d.currentTeam->name
 //                      << (state->property("type").toInt() == TeamTimedOut
 //                          ? "Didn't answer in time" : "Answered wrong")
@@ -590,7 +601,7 @@ void GraphicsScene::onStateEntered()
         ++d.right;
         Q_ASSERT(d.currentTeam);
         Q_ASSERT(d.currentFrame);
-        d.currentTeam->score += d.currentFrame->value;
+        d.currentTeam->addPoints(d.currentFrame->value());
 //             qDebug() << d.currentTeam->name << "answered correctly and earned" << d.currentFrame->value
 //                      << "$. They now have" << d.currentTeam->score << "$";
         finishQuestion();
@@ -598,7 +609,7 @@ void GraphicsScene::onStateEntered()
     case Finished:
         qSort(d.teams.end(), d.teams.begin(), compareTeamsByScore);
         for (int i=0; i<d.teams.size(); ++i) {
-            qDebug() << i << d.teams.at(i)->score << d.teams.at(i)->name;
+            qDebug() << i << d.teams.at(i)->points() << d.teams.at(i)->objectName();
         }
         qDebug() << "right" << d.right << "wrong" << d.wrong << "timedout" << d.timedout;
         d.stateMachine.stop();
@@ -614,13 +625,13 @@ void GraphicsScene::onStateExited()
     switch (state->property("type").toInt()) {
     case Normal: {
         int idx = rand() % d.frames.size();
-        while (d.frames.at(idx)->status != Frame::Hidden) {
+        while (d.frames.at(idx)->status() != Frame::Hidden) {
             if (++idx == d.frames.size())
                 idx = 0;
         }
         Q_ASSERT(!d.currentFrame);
         d.currentFrame = d.frames.at(idx);
-        Q_ASSERT(d.currentFrame->status == Frame::Hidden);
+        Q_ASSERT(d.currentFrame->status() == Frame::Hidden);
         --d.framesLeft;
         break; }
     default:

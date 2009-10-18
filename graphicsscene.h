@@ -57,6 +57,8 @@ private:
         NumStates
     };
 
+
+
     struct Data {
         QStateMachine stateMachine;
         QState *states[NumStates];
