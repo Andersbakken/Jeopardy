@@ -20,6 +20,10 @@ static inline QRectF raisedGeometry(const QRectF &sceneRect)
 GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
+    d.elapsed = 0;
+    d.currentState = 0;
+    connect(&d.timeoutTimer, SIGNAL(timeout()), this, SIGNAL(nextStateTimeOut()));
+
     d.wrongAnswerItem = new Item;
     d.wrongAnswerItem->setOpacity(0.0);
     d.wrongAnswerItem->setBackgroundColor(Qt::red);
@@ -464,7 +468,6 @@ void GraphicsScene::keyPressEvent(QKeyEvent *e)
 
 void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *e)
 {
-    qDebug("%s %d: void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *e)", __FILE__, __LINE__);
     emit mouseButtonPressed(e->scenePos(), e->button());
     QGraphicsScene::mousePressEvent(e);
 }
@@ -477,16 +480,62 @@ QRectF GraphicsScene::frameGeometry(Frame *frame) const
 
 void GraphicsScene::click(Frame *frame)
 {
-    if (!d.proxy.activeFrame()) {
-        setupStateMachine(frame);
-        emit showQuestion();
-    } else {
-        emit rightAnswer();
-    }
+//     if (!d.proxy.activeFrame()) {
+//         setupStateMachine(frame);
+//         emit showQuestion();
+//     } else {
+//         emit rightAnswer();
+//     }
 }
 
 void GraphicsScene::onClicked(Item *item)
 {
+    if (d.currentState && item) {
+        switch (d.currentState - d.states[0]) {
+        case Normal:
+            if (Frame *frame = qgraphicsitem_cast<Frame*>(item)) {
+                d.currentFrame = frame;
+                d.proxy.setActiveFrame(frame);
+                const QRectF r = frameGeometry(frame);
+                d.states[Normal]->assignProperty(&d.proxy, "geometry", r);
+                d.states[Normal]->assignProperty(&d.proxy, "text", frame->valueString());
+                d.states[ShowQuestion]->assignProperty(&d.proxy, "text", frame->question());
+                d.states[RightAnswer]->assignProperty(&d.proxy, "text", QString("%1 is the answer :-)").arg(frame->answer()));
+                d.states[RightAnswer]->assignProperty(&d.proxy, "geometry", r);
+                d.states[WrongAnswer]->assignProperty(&d.proxy, "text", QString("%1 is the answer :-(").arg(frame->answer()));
+                d.states[WrongAnswer]->assignProperty(&d.proxy, "geometry", r);
+                emit nextState();
+            }
+            break;
+        case ShowQuestion:
+            qDebug("%s %d: case ShowQuestion:", __FILE__, __LINE__);
+            break;
+        case TimeOut:
+            qDebug("%s %d: case TimeOut:", __FILE__, __LINE__);
+            break;
+        case PickTeam:
+            qDebug("%s %d: case PickTeam:", __FILE__, __LINE__);
+            break;
+        case TeamTimedOut:
+            qDebug("%s %d: case TeamTimedOut:", __FILE__, __LINE__);
+            break;
+        case PickRightOrWrong:
+            qDebug("%s %d: case PickRightOrWrong:", __FILE__, __LINE__);
+            break;
+        case WrongAnswer:
+            qDebug("%s %d: case WrongAnswer:", __FILE__, __LINE__);
+            break;
+        case RightAnswer:
+            qDebug("%s %d: case RightAnswer:", __FILE__, __LINE__);
+            break;
+        case Finished:
+            qDebug("%s %d: case Finished:", __FILE__, __LINE__);
+            break;
+        case NumStates:
+            qDebug("%s %d: case NumStates:", __FILE__, __LINE__);
+            break;
+        }
+    }
     if (Frame *frame = qgraphicsitem_cast<Frame*>(item)) {
         if (frame->flags() & QGraphicsItem::ItemIsSelectable) {
             click(frame);
@@ -552,15 +601,17 @@ static inline bool compareTeamsByScore(const Team *left, const Team *right)
 
 void GraphicsScene::onStateEntered()
 {
-    QState *state = qobject_cast<QState*>(sender());
-    const int type = state->property("type").toInt();
+    d.currentState = qobject_cast<QState*>(sender());
+    const int type = d.currentState->property("type").toInt();
     switch (type) {
     case Normal:
         Q_ASSERT(d.teamsAttempted.isEmpty());
         Q_ASSERT(!d.currentTeam);
         Q_ASSERT(!d.currentFrame);
+        d.elapsed = 0;
         break;
     case ShowQuestion: {
+        d.timeoutTimer.start(5000 - d.elapsed);
         if (d.teamsAttempted.size() == d.teams.size()) {
             emit nextStateTimeOut();
         } else {
@@ -624,15 +675,15 @@ void GraphicsScene::onStateExited()
     QState *state = qobject_cast<QState*>(sender());
     switch (state->property("type").toInt()) {
     case Normal: {
-        int idx = rand() % d.frames.size();
-        while (d.frames.at(idx)->status() != Frame::Hidden) {
-            if (++idx == d.frames.size())
-                idx = 0;
-        }
-        Q_ASSERT(!d.currentFrame);
-        d.currentFrame = d.frames.at(idx);
-        Q_ASSERT(d.currentFrame->status() == Frame::Hidden);
-        --d.framesLeft;
+//         int idx = rand() % d.frames.size();
+//         while (d.frames.at(idx)->status() != Frame::Hidden) {
+//             if (++idx == d.frames.size())
+//                 idx = 0;
+//         }
+//         Q_ASSERT(!d.currentFrame);
+//         d.currentFrame = d.frames.at(idx);
+//         Q_ASSERT(d.currentFrame->status() == Frame::Hidden);
+//         --d.framesLeft;
         break; }
     default:
         break;

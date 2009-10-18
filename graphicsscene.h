@@ -57,11 +57,10 @@ private:
         NumStates
     };
 
-
-
     struct Data {
         QStateMachine stateMachine;
         QState *states[NumStates];
+        QState *currentState;
         QList<Team*> teams;
         QSet<Team*> teamsAttempted;
         Team *currentTeam;
@@ -79,6 +78,8 @@ private:
         TeamProxy *teamProxy;
         int answerTime;
         Item *rightAnswerItem, *wrongAnswerItem;
+        QTimer timeoutTimer;
+        int elapsed;
     } d;
 };
 
