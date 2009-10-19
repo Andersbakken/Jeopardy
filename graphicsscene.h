@@ -80,6 +80,7 @@ private:
         QTimer timeoutTimer;
         QTime timeoutTimerStarted;
         int elapsed;
+        StatusBar *statusBar;
     } d;
 };
 

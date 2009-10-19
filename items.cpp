@@ -233,3 +233,37 @@ void TeamProxy::setGeometry(const QRectF &geometry)
     d.scene->setTeamGeometry(geometry);
 }
 
+void StatusBar::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
+{
+    const QRectF r = rect();
+    if (d.maximum != 0) {
+        const qreal x = qreal(d.value) / qreal(d.maximum) * r.width();
+        painter->fillRect(0, 0, x, r.height(), backgroundColor());
+        painter->drawText(r, Qt::AlignCenter, text());
+    }
+}
+
+static inline int _q_interpolate(int f, int t, qreal progress)
+{
+    return int(qreal(f) + (qreal(t) - qreal(f)) * progress);
+
+}
+
+static inline QColor _q_interpolate(const QColor &f, const QColor &t, qreal progress)
+{
+    return QColor(_q_interpolate(f.red(), t.red(), progress),
+                  _q_interpolate(f.green(), t.green(), progress),
+                  _q_interpolate(f.blue(), t.blue(), progress),
+                  _q_interpolate(f.alpha(), t.alpha(), progress));
+}
+
+void StatusBar::setValue(int value)
+{
+    if (d.maximum != 0) {
+        d.value = value;
+        const qreal progress = qreal(value) / qreal(d.maximum);
+        setBackgroundColor(_q_interpolate(Qt::green, Qt::red, progress));
+        qDebug() << progress << value << d.maximum << backgroundColor();
+        setText(QString("%1%%").arg(progress * 100));
+    }
+}

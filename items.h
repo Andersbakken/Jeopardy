@@ -37,6 +37,24 @@ private:
     friend class GraphicsScene;
 };
 
+class StatusBar : public Item
+{
+    Q_OBJECT
+    Q_PROPERTY(int maximum READ maximum WRITE setMaximum)
+    Q_PROPERTY(int value READ value WRITE setValue)
+public:
+    StatusBar() : Item() { d.maximum = d.value = 0; setColor(Qt::black); }
+    int maximum() const { return d.maximum; }
+    void setMaximum(int maximum) { d.maximum = maximum; update(); }
+    int value() const { return d.value; }
+    void setValue(int value);
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = 0);
+private:
+    struct Data {
+        int maximum, value;
+    } d;
+};
+
 class Frame : public Item
 {
     Q_OBJECT

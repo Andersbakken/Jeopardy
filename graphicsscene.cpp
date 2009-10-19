@@ -22,6 +22,10 @@ GraphicsScene::GraphicsScene(QObject *parent)
 {
     d.elapsed = 0;
     d.currentState = 0;
+    d.statusBar = new StatusBar;
+    addItem(d.statusBar);
+    d.statusBar->setMaximum(100);
+    d.statusBar->setValue(45);
     connect(&d.timeoutTimer, SIGNAL(timeout()), this, SIGNAL(nextStateTimeOut()));
 
     d.wrongAnswerItem = new Item;
@@ -431,9 +435,9 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rr)
     if (d.sceneRectChangedBlocked || rr.isEmpty())
         return;
 
-    enum { TeamsHeight = 100 };
+    enum { TeamsHeight = 100, StatusBarHeight = 20 };
     d.teamsGeometry = QRectF(rr.topLeft(), QSize(rr.width(), TeamsHeight));
-    d.framesGeometry = rr.adjusted(0, TeamsHeight, 0, 0);
+    d.framesGeometry = rr.adjusted(0, TeamsHeight, 0, -StatusBarHeight );
 
     d.states[ShowQuestion]->assignProperty(&d.proxy, "geometry", ::raisedGeometry(d.framesGeometry));
 
@@ -471,6 +475,8 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rr)
     d.states[PickTeam]->assignProperty(d.teamProxy, "geometry", raised);
     d.wrongAnswerItem->setGeometry(QRectF(raised.x(), raised.y(), raised.width() / 2, raised.height()));
     d.rightAnswerItem->setGeometry(QRectF(raised.x() + (raised.width() / 2), raised.y(), raised.width() / 2, raised.height()));
+    d.statusBar->setGeometry(rr.left(), rr.bottom() - StatusBarHeight, rr.width(), StatusBarHeight);
+
     d.sceneRectChangedBlocked = false;
 }
 
@@ -481,6 +487,7 @@ void GraphicsScene::reset()
     Q_ASSERT(d.wrongAnswerItem);
     removeItem(d.rightAnswerItem);
     removeItem(d.wrongAnswerItem);
+    removeItem(d.statusBar);
     d.sceneRectChangedBlocked = false;
     clear();
     d.frames.clear();
@@ -488,6 +495,7 @@ void GraphicsScene::reset()
     d.teams.clear();
     addItem(d.rightAnswerItem);
     addItem(d.wrongAnswerItem);
+    addItem(d.statusBar);
 }
 
 void GraphicsScene::keyPressEvent(QKeyEvent *e)
