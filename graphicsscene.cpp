@@ -417,8 +417,9 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
         team->setZValue(100.0);
         team->setBackgroundColor(Qt::darkGray);
         team->setColor(Qt::white);
-        d.states[Normal]->assignProperty(team, "backgroundColor", Qt::darkGray);
-        d.states[Normal]->assignProperty(team, "color", Qt::white);
+//        d.states[WrongAnswer]->assignProperty(team, "backgroundColor", Qt::darkGray);
+        d.states[RightAnswer]->assignProperty(team, "backgroundColor", Qt::darkGray);
+        d.states[RightAnswer]->assignProperty(team, "color", Qt::white);
         d.teams.append(team);
         addItem(team);
     }
@@ -529,6 +530,8 @@ void GraphicsScene::onClicked(Item *item)
         switch (type) {
         case Normal:
             if (Frame *frame = qgraphicsitem_cast<Frame*>(item)) {
+                if (frame->status() != Frame::Hidden)
+                    break;
                 d.currentFrame = frame;
                 d.proxy.setActiveFrame(frame);
                 const QRectF r = frameGeometry(frame);
@@ -688,6 +691,7 @@ void GraphicsScene::onStateEntered()
         Q_ASSERT(d.currentTeam);
         Q_ASSERT(d.currentFrame);
         d.currentTeam->addPoints(-d.currentFrame->value() / 2);
+        d.currentFrame->setStatus(Frame::Failed);
         if (d.teamsAttempted.size() + 1 == d.teams.size()) {
             finishQuestion();
             emit nextStateFinished();
@@ -704,6 +708,7 @@ void GraphicsScene::onStateEntered()
         d.currentTeam->addPoints(d.currentFrame->value());
 //             qDebug() << d.currentTeam->name << "answered correctly and earned" << d.currentFrame->value
 //                      << "$. They now have" << d.currentTeam->score << "$";
+        d.currentFrame->setStatus(Frame::Succeeded);
         finishQuestion();
         emit nextState();
         break;
@@ -749,6 +754,7 @@ void GraphicsScene::onStateExited()
 
 void GraphicsScene::finishQuestion()
 {
+    d.currentFrame->setAcceptHoverEvents(false);
     d.currentFrame = 0;
     d.teamsAttempted.clear();
     d.currentTeam = 0;
