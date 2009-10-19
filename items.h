@@ -164,7 +164,7 @@ class TeamProxy : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(qreal opacity READ opacity WRITE setOpacity)
-    Q_PROPERTY(QRectF rect READ rect WRITE setRect)
+    Q_PROPERTY(QRectF geometry READ geometry WRITE setGeometry)
     Q_PROPERTY(QColor backgroundColor READ backgroundColor WRITE setBackgroundColor)
     Q_PROPERTY(QColor color READ color WRITE setColor)
 public:
@@ -174,8 +174,8 @@ public:
     void setTeams(const QList<Team*> &teams) { d.teams = teams; }
     qreal opacity() const { return d.teams.isEmpty() ? 0.0 : d.teams.at(0)->opacity(); }
     void setOpacity(qreal opacity) { foreach(Item *team, d.teams) team->setOpacity(opacity); }
-    QRectF rect() const { return d.rect; }
-    void setRect(const QRectF &rect);
+    QRectF geometry() const { return d.geometry; }
+    void setGeometry(const QRectF &geometry);
     QColor backgroundColor() const { return d.activeTeam ? d.activeTeam->backgroundColor() : QColor(); }
     void setBackgroundColor(const QColor &tt) { if (d.activeTeam) d.activeTeam->setBackgroundColor(tt); }
     QColor color() const { return d.activeTeam ? d.activeTeam->color() : QColor(); }
@@ -186,7 +186,7 @@ private:
         GraphicsScene *scene;
         QList<Team*> teams;
         Team *activeTeam;
-        QRectF rect;
+        QRectF geometry;
     } d;
 };
 

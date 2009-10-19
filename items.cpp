@@ -227,9 +227,9 @@ void Frame::draw(QPainter *painter, const QRect &rect)
     }
 }
 
-void TeamProxy::setRect(const QRectF &rect)
+void TeamProxy::setGeometry(const QRectF &geometry)
 {
-    d.rect = rect;
-    d.scene->setTeamGeometry(rect);
+    d.geometry = geometry;
+    d.scene->setTeamGeometry(geometry);
 }
 

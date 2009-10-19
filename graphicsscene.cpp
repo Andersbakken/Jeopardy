@@ -66,19 +66,42 @@ GraphicsScene::GraphicsScene(QObject *parent)
         d.states[i] = state;
     }
 
-    d.states[Normal]->addTransition(this, SIGNAL(nextState()), d.states[ShowQuestion]);
+    QParallelAnimationGroup *proxyGroup = new QParallelAnimationGroup(this);
+    proxyGroup->addAnimation(new QPropertyAnimation(&d.proxy, "yRotation"));
+    proxyGroup->addAnimation(new QPropertyAnimation(&d.proxy, "geometry"));
+    proxyGroup->addAnimation(new QPropertyAnimation(&d.proxy, "backgroundColor"));
+    proxyGroup->addAnimation(new QPropertyAnimation(&d.proxy, "color"));
+
+    QParallelAnimationGroup *teamProxyGroup = new QParallelAnimationGroup(this);
+    teamProxyGroup->addAnimation(new QPropertyAnimation(d.teamProxy, "geometry"));
+
+    QParallelAnimationGroup *rightWrongOpacityGroup = new QParallelAnimationGroup(this);
+    rightWrongOpacityGroup->addAnimation(new QPropertyAnimation(d.rightAnswerItem, "opacity"));
+    rightWrongOpacityGroup->addAnimation(new QPropertyAnimation(d.wrongAnswerItem, "opacity"));
+
+    QAbstractTransition *normalToShowQuestion = d.states[Normal]->addTransition(this, SIGNAL(nextState()), d.states[ShowQuestion]);
+    normalToShowQuestion->addAnimation(proxyGroup);
     d.states[ShowQuestion]->addTransition(this, SIGNAL(nextStateTimeOut()),
                                           d.states[TimeOut]);
-    d.states[ShowQuestion]->addTransition(this, SIGNAL(nextState()),
-                                          d.states[PickTeam]);
+    QAbstractTransition *showQuestionToPickTeam = d.states[ShowQuestion]->addTransition(this, SIGNAL(nextState()),
+                                                                                        d.states[PickTeam]);
+    showQuestionToPickTeam->addAnimation(teamProxyGroup);
     d.states[TimeOut]->addTransition(this, SIGNAL(nextState()),
                                      d.states[Normal]);
     d.states[TimeOut]->addTransition(this, SIGNAL(nextStateFinished()),
                                      d.states[Finished]);
 //     d.states[PickTeam]->addTransition(this, SIGNAL(nextStateTimeOut()),
 //                                       d.states[TeamTimedOut]);
-    d.states[PickTeam]->addTransition(this, SIGNAL(nextState()),
-                                      d.states[PickRightOrWrong]);
+    QAbstractTransition *pickTeamToPickRightOrWrong = d.states[PickTeam]->addTransition(this, SIGNAL(nextState()),
+                                                                                        d.states[PickRightOrWrong]);
+    {
+        QSequentialAnimationGroup *sequential = new QSequentialAnimationGroup(this);
+        sequential->addAnimation(teamProxyGroup);
+        sequential->addPause(200);
+        sequential->addAnimation(rightWrongOpacityGroup);
+        pickTeamToPickRightOrWrong->addAnimation(sequential);
+    }
+
     d.states[TeamTimedOut]->addTransition(this, SIGNAL(nextState()),
                                           d.states[ShowQuestion]);
     d.states[PickRightOrWrong]->addTransition(this, SIGNAL(nextStateRight()),
@@ -443,9 +466,9 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rr)
 
     for (int i=0; i<NumStates; ++i) {
         if (i != PickTeam && d.states[i])
-            d.states[i]->assignProperty(d.teamProxy, "rect", d.teamsGeometry);
+            d.states[i]->assignProperty(d.teamProxy, "geometry", d.teamsGeometry);
     }
-    d.states[PickTeam]->assignProperty(d.teamProxy, "rect", raised);
+    d.states[PickTeam]->assignProperty(d.teamProxy, "geometry", raised);
     d.wrongAnswerItem->setGeometry(QRectF(raised.x(), raised.y(), raised.width() / 2, raised.height()));
     d.rightAnswerItem->setGeometry(QRectF(raised.x() + (raised.width() / 2), raised.y(), raised.width() / 2, raised.height()));
     d.sceneRectChangedBlocked = false;
@@ -636,6 +659,11 @@ void GraphicsScene::onStateEntered()
         Q_ASSERT(d.currentFrame);
         d.currentFrame->setStatus(Frame::Failed);
         finishQuestion();
+        if (d.framesLeft == 0) {
+            emit nextStateFinished();
+        } else {
+            emit nextState();
+        }
         break;
     case PickTeam:
         foreach(Team *team, d.teams) {
