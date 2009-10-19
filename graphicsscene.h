@@ -14,7 +14,6 @@ public:
     void keyPressEvent(QKeyEvent *e);
     void mousePressEvent(QGraphicsSceneMouseEvent *e);
     QRectF frameGeometry(Frame *frame) const;
-    void click(Frame *frame);
     void setupStateMachine(Frame *frame);
     int answerTime() const;
     void setTeamGeometry(const QRectF &rect);
@@ -79,6 +78,7 @@ private:
         int answerTime;
         Item *rightAnswerItem, *wrongAnswerItem;
         QTimer timeoutTimer;
+        QTime timeoutTimerStarted;
         int elapsed;
     } d;
 };

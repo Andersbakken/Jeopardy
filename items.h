@@ -34,6 +34,7 @@ private:
         bool hovered;
         QColor backgroundColor, color;
     } d;
+    friend class GraphicsScene;
 };
 
 class Frame : public Item
@@ -71,8 +72,8 @@ public:
     void setAnswer(const QString &answer) { d.answer = answer; }
 
     virtual void draw(QPainter *, const QRect &);
-
-
+    static void setFramesAcceptHoverEvents(bool on) { Data::framesAcceptHoverEvents = on; }
+    static bool framesAcceptHoverEvents() { return Data::framesAcceptHoverEvents; }
 private:
     struct Data {
         QString question, answer, valueString;
@@ -81,6 +82,7 @@ private:
         int row, column;
         QColor progressBarColor;
         Status status;
+        static bool framesAcceptHoverEvents;
     } d;
 };
 

@@ -1,6 +1,7 @@
 #include "graphicsscene.h"
 #include "items.h"
 
+bool Frame::Data::framesAcceptHoverEvents = true;
 static inline void initTextLayout(QTextLayout *layout, const QRectF &rect, int pixelSize)
 {
     layout->setCacheEnabled(true);
@@ -76,7 +77,6 @@ private:
 
 Item::Item()
 {
-    setAcceptHoverEvents(true);
     setCacheMode(ItemCoordinateCache);
     d.yRotation = 0;
     d.hovered = false;
@@ -145,6 +145,8 @@ qreal Item::yRotation() const
 
 void Item::hoverEnterEvent(QGraphicsSceneHoverEvent *)
 {
+    if (!Frame::framesAcceptHoverEvents() && qgraphicsitem_cast<Frame*>(this))
+        return;
     d.hovered = true;
     update();
 }
@@ -154,8 +156,6 @@ void Item::hoverLeaveEvent(QGraphicsSceneHoverEvent *)
     d.hovered = false;
     update();
 }
-
-
 
 void Item::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
 {
@@ -205,6 +205,7 @@ void SelectorItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opti
 Frame::Frame(int row, int column)
     : Item()
 {
+    setAcceptHoverEvents(true);
     d.status = Hidden;
     d.row = row;
     d.column = column;
@@ -231,3 +232,4 @@ void TeamProxy::setRect(const QRectF &rect)
     d.rect = rect;
     d.scene->setTeamGeometry(rect);
 }
+

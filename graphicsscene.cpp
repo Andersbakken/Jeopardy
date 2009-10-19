@@ -30,6 +30,8 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.wrongAnswerItem->setColor(Qt::black);
     d.wrongAnswerItem->setText("Wrong!");
     d.wrongAnswerItem->setZValue(200);
+    connect(d.wrongAnswerItem, SIGNAL(clicked(Item*, QPointF)), this, SLOT(onClicked(Item*)));
+
     addItem(d.wrongAnswerItem);
 
     d.rightAnswerItem = new Item;
@@ -38,6 +40,8 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.rightAnswerItem->setText("Right!");
     d.rightAnswerItem->setOpacity(0.0);
     d.rightAnswerItem->setZValue(200);
+    connect(d.rightAnswerItem, SIGNAL(clicked(Item*, QPointF)), this, SLOT(onClicked(Item*)));
+
     addItem(d.rightAnswerItem);
 
     d.teamProxy = new TeamProxy(this);
@@ -71,8 +75,8 @@ GraphicsScene::GraphicsScene(QObject *parent)
                                      d.states[Normal]);
     d.states[TimeOut]->addTransition(this, SIGNAL(nextStateFinished()),
                                      d.states[Finished]);
-    d.states[PickTeam]->addTransition(this, SIGNAL(nextStateTimeOut()),
-                                      d.states[TeamTimedOut]);
+//     d.states[PickTeam]->addTransition(this, SIGNAL(nextStateTimeOut()),
+//                                       d.states[TeamTimedOut]);
     d.states[PickTeam]->addTransition(this, SIGNAL(nextState()),
                                       d.states[PickRightOrWrong]);
     d.states[TeamTimedOut]->addTransition(this, SIGNAL(nextState()),
@@ -87,6 +91,8 @@ GraphicsScene::GraphicsScene(QObject *parent)
                                          d.states[Finished]);
     d.states[WrongAnswer]->addTransition(this, SIGNAL(nextState()),
                                          d.states[ShowQuestion]);
+    d.states[WrongAnswer]->addTransition(this, SIGNAL(nextStateFinished()),
+                                         d.states[Normal]);
 
     d.states[Normal]->assignProperty(&d.proxy, "yRotation", 0.0);
     d.states[Normal]->assignProperty(&d.proxy, "answerProgress", 0.0);
@@ -95,12 +101,15 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.states[ShowQuestion]->assignProperty(&d.proxy, "yRotation", 360.0);
     d.states[ShowQuestion]->assignProperty(&d.proxy, "answerProgress", 1.0);
     d.states[ShowQuestion]->assignProperty(&d.proxy, "progressBarColor", Qt::green);
+    d.states[ShowQuestion]->assignProperty(&d.proxy, "backgroundColor", Qt::blue);
+    d.states[ShowQuestion]->assignProperty(&d.proxy, "color", Qt::white);
 
 //    d.states[PickTeam]->assignProperty(d.teamProxy, "opacity", 1.0);
     d.states[PickTeam]->assignProperty(&d.proxy, "answerProgress", 0.0);
 
     d.states[PickRightOrWrong]->assignProperty(d.rightAnswerItem, "opacity", 1.0);
     d.states[PickRightOrWrong]->assignProperty(d.wrongAnswerItem, "opacity", 1.0);
+    d.states[PickRightOrWrong]->assignProperty(d.teamProxy, "color", Qt::black);
 
     d.states[WrongAnswer]->assignProperty(&d.proxy, "backgroundColor", Qt::red);
     d.states[WrongAnswer]->assignProperty(&d.proxy, "color", Qt::black);
@@ -108,11 +117,15 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.states[WrongAnswer]->assignProperty(&d.proxy, "yRotation", 0.0);
     d.states[WrongAnswer]->assignProperty(d.rightAnswerItem, "opacity", 0.0);
     d.states[WrongAnswer]->assignProperty(d.wrongAnswerItem, "opacity", 0.0);
+    d.states[WrongAnswer]->assignProperty(d.teamProxy, "backgroundColor", Qt::red);
+    d.states[WrongAnswer]->assignProperty(d.teamProxy, "color", Qt::black);
 
     d.states[RightAnswer]->assignProperty(&d.proxy, "backgroundColor", Qt::green);
     d.states[RightAnswer]->assignProperty(&d.proxy, "color", Qt::black);
     d.states[RightAnswer]->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.states[RightAnswer]->assignProperty(&d.proxy, "yRotation", 0.0);
+    d.states[RightAnswer]->assignProperty(d.rightAnswerItem, "opacity", 0.0);
+    d.states[RightAnswer]->assignProperty(d.wrongAnswerItem, "opacity", 0.0);
 
     d.states[TeamTimedOut]->assignProperty(d.teamProxy, "backgroundColor", Qt::red);
     d.states[TeamTimedOut]->assignProperty(&d.proxy, "color", Qt::black);
@@ -378,6 +391,7 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
         team->setBackgroundColor(Qt::darkGray);
         team->setColor(Qt::white);
         d.states[Normal]->assignProperty(team, "backgroundColor", Qt::darkGray);
+        d.states[Normal]->assignProperty(team, "color", Qt::white);
         d.teams.append(team);
         addItem(team);
     }
@@ -385,6 +399,7 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
 
     onSceneRectChanged(sceneRect());
     connect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(onSceneRectChanged(QRectF)));
+    d.framesLeft = d.frames.size();
     return true;
 }
 
@@ -420,9 +435,7 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rr)
         frame->setGeometry(r);
     }
 
-    if (!d.stateMachine.isRunning()) {
-        setTeamGeometry(d.teamsGeometry);
-    }
+    setTeamGeometry(d.teamsGeometry);
 //     static QState *const states[] = {
 //         d.states[Normal], d.states[ShowQuestion], d.states[ShowAnswer],
 //         d.states[PickRightOrWrong], d.states[RightAnswer], d.states[WrongAnswer], 0
@@ -478,20 +491,11 @@ QRectF GraphicsScene::frameGeometry(Frame *frame) const
     return ::itemGeometry(frame->row() + 1, frame->column(), 6, d.topics.size(), d.framesGeometry);
 }
 
-void GraphicsScene::click(Frame *frame)
-{
-//     if (!d.proxy.activeFrame()) {
-//         setupStateMachine(frame);
-//         emit showQuestion();
-//     } else {
-//         emit rightAnswer();
-//     }
-}
-
 void GraphicsScene::onClicked(Item *item)
 {
     if (d.currentState && item) {
-        switch (d.currentState - d.states[0]) {
+        const int type = d.currentState->property("type").toInt();
+        switch (type) {
         case Normal:
             if (Frame *frame = qgraphicsitem_cast<Frame*>(item)) {
                 d.currentFrame = frame;
@@ -508,22 +512,35 @@ void GraphicsScene::onClicked(Item *item)
             }
             break;
         case ShowQuestion:
-            qDebug("%s %d: case ShowQuestion:", __FILE__, __LINE__);
+            if (item == d.currentFrame) {
+                d.elapsed += d.timeoutTimerStarted.msecsTo(QTime::currentTime());
+                d.timeoutTimer.stop();
+                emit nextState();
+            }
             break;
         case TimeOut:
             qDebug("%s %d: case TimeOut:", __FILE__, __LINE__);
             break;
         case PickTeam:
-            qDebug("%s %d: case PickTeam:", __FILE__, __LINE__);
+            if (Team *team = qgraphicsitem_cast<Team*>(item)) {
+                item->d.hovered = false; // hack
+                team->update();
+                d.currentTeam = team;
+                d.teamProxy->setActiveTeam(d.currentTeam);
+                emit nextState();
+            }
             break;
         case TeamTimedOut:
             qDebug("%s %d: case TeamTimedOut:", __FILE__, __LINE__);
             break;
         case PickRightOrWrong:
-            qDebug("%s %d: case PickRightOrWrong:", __FILE__, __LINE__);
+            if (item == d.rightAnswerItem) {
+                emit nextStateRight();
+            } else if (item == d.wrongAnswerItem) {
+                emit nextStateWrong();
+            }
             break;
         case WrongAnswer:
-            qDebug("%s %d: case WrongAnswer:", __FILE__, __LINE__);
             break;
         case RightAnswer:
             qDebug("%s %d: case RightAnswer:", __FILE__, __LINE__);
@@ -535,12 +552,6 @@ void GraphicsScene::onClicked(Item *item)
             qDebug("%s %d: case NumStates:", __FILE__, __LINE__);
             break;
         }
-    }
-    if (Frame *frame = qgraphicsitem_cast<Frame*>(item)) {
-        if (frame->flags() & QGraphicsItem::ItemIsSelectable) {
-            click(frame);
-        }
-        return;
     }
 
     if (Team *team = qgraphicsitem_cast<Team*>(item)) {
@@ -602,6 +613,7 @@ static inline bool compareTeamsByScore(const Team *left, const Team *right)
 void GraphicsScene::onStateEntered()
 {
     d.currentState = qobject_cast<QState*>(sender());
+    qDebug() << d.currentState->objectName() << "entered";
     const int type = d.currentState->property("type").toInt();
     switch (type) {
     case Normal:
@@ -611,7 +623,7 @@ void GraphicsScene::onStateEntered()
         d.elapsed = 0;
         break;
     case ShowQuestion: {
-        d.timeoutTimer.start(5000 - d.elapsed);
+//        d.timeoutTimer.start(5000 - d.elapsed);
         if (d.teamsAttempted.size() == d.teams.size()) {
             emit nextStateTimeOut();
         } else {
@@ -626,12 +638,11 @@ void GraphicsScene::onStateEntered()
         finishQuestion();
         break;
     case PickTeam:
+        foreach(Team *team, d.teams) {
+            if (!d.teamsAttempted.contains(team))
+                team->setAcceptHoverEvents(true);
+        }
         Q_ASSERT(!d.currentTeam);
-        Q_ASSERT(d.teamsAttempted.size() < d.teams.size());
-        do {
-            d.currentTeam = d.teams.at(rand() % d.teams.size());
-        } while (d.teamsAttempted.contains(d.currentTeam));
-        d.teamsAttempted.insert(d.currentTeam);
         break;
     case TeamTimedOut:
         ++d.timedout;
@@ -641,12 +652,14 @@ void GraphicsScene::onStateEntered()
         Q_ASSERT(d.currentTeam);
         Q_ASSERT(d.currentFrame);
         d.currentTeam->addPoints(-d.currentFrame->value() / 2);
-//             qDebug() << d.currentTeam->name
-//                      << (state->property("type").toInt() == TeamTimedOut
-//                          ? "Didn't answer in time" : "Answered wrong")
-//                      << "They lost" << (d.currentFrame->value / 2) << "$. They now have"
-//                      << d.currentTeam->score << "$";
-        d.currentTeam = 0;
+        if (d.teamsAttempted.size() + 1 == d.teams.size()) {
+            finishQuestion();
+            emit nextStateFinished();
+        } else {
+            d.teamsAttempted.insert(d.currentTeam);
+            d.currentTeam = 0;
+            emit nextState();
+        }
         break;
     case RightAnswer:
         ++d.right;
@@ -656,6 +669,7 @@ void GraphicsScene::onStateEntered()
 //             qDebug() << d.currentTeam->name << "answered correctly and earned" << d.currentFrame->value
 //                      << "$. They now have" << d.currentTeam->score << "$";
         finishQuestion();
+        emit nextState();
         break;
     case Finished:
         qSort(d.teams.end(), d.teams.begin(), compareTeamsByScore);
@@ -664,7 +678,6 @@ void GraphicsScene::onStateEntered()
         }
         qDebug() << "right" << d.right << "wrong" << d.wrong << "timedout" << d.timedout;
         d.stateMachine.stop();
-        QTimer::singleShot(500, this, SLOT(newGame()));
         break;
     }
 //        qDebug() << sender()->objectName() << "entered";
@@ -673,7 +686,13 @@ void GraphicsScene::onStateEntered()
 void GraphicsScene::onStateExited()
 {
     QState *state = qobject_cast<QState*>(sender());
-    switch (state->property("type").toInt()) {
+    const int type = state->property("type").toInt();
+    switch (type) {
+    case PickTeam:
+        foreach(Team *team, d.teams)
+            team->setAcceptHoverEvents(false);
+        break;
+
     case Normal: {
 //         int idx = rand() % d.frames.size();
 //         while (d.frames.at(idx)->status() != Frame::Hidden) {
@@ -697,6 +716,7 @@ void GraphicsScene::finishQuestion()
     d.currentFrame = 0;
     d.teamsAttempted.clear();
     d.currentTeam = 0;
+    d.teamProxy->setActiveTeam(0);
     if (d.framesLeft == 0)
         emit nextStateFinished();
 }
