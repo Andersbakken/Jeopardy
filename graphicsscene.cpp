@@ -17,6 +17,50 @@ static inline QRectF raisedGeometry(const QRectF &sceneRect)
                               -sceneRect.width() * adjust, -sceneRect.height() * adjust);
 }
 
+class TextAnimation : public QPropertyAnimation
+{
+public:
+    TextAnimation(QObject *o, const QByteArray &propertyName)
+        : QPropertyAnimation(o, propertyName)
+    {}
+    virtual QVariant interpolated(const QVariant &from, const QVariant &to, qreal progress) const
+    {
+        if (qFuzzyIsNull(progress)) {
+            return from;
+        } else if (qFuzzyCompare(progress, 1.0)) {
+            return to;
+        }
+
+#if 0
+        if (progress < .5) {
+            QString fromString = from.toString();
+            const int letters = fromString.size() * (progress * 2);
+            fromString.chop(letters);
+            return fromString;
+        } else {
+            const QString toString = to.toString();
+            const int letters = toString.size() * ((progress - 0.5) * 2);
+            return toString.mid(letters);
+        }
+#else
+        QString fromString = from.toString();
+        const QString toString = to.toString();
+        const int letters = fromString.size() + toString.size();
+        const int current = letters * progress;
+        if (current == fromString.size()) {
+            return QString();
+        } else if (current < fromString.size()) {
+            fromString.chop(current);
+            return fromString;
+        }
+        return toString.mid(toString.size() - (current - fromString.size()));
+#endif
+    }
+private:
+    QGraphicsWidget *widget;
+};
+
+
 GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
@@ -75,6 +119,9 @@ GraphicsScene::GraphicsScene(QObject *parent)
     proxyGroup->addAnimation(new QPropertyAnimation(&d.proxy, "geometry"));
     proxyGroup->addAnimation(new QPropertyAnimation(&d.proxy, "backgroundColor"));
     proxyGroup->addAnimation(new QPropertyAnimation(&d.proxy, "color"));
+    TextAnimation *textAnimation = new TextAnimation(&d.proxy, "text");
+    textAnimation->setDuration(1000);
+    proxyGroup->addAnimation(textAnimation);
 
     QParallelAnimationGroup *teamProxyGroup = new QParallelAnimationGroup(this);
     teamProxyGroup->addAnimation(new QPropertyAnimation(d.teamProxy, "geometry"));
@@ -126,13 +173,13 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.states[Normal]->assignProperty(&d.proxy, "progressBarColor", Qt::yellow);
 
     d.states[ShowQuestion]->assignProperty(&d.proxy, "yRotation", 360.0);
-    d.states[ShowQuestion]->assignProperty(&d.proxy, "answerProgress", 1.0);
-    d.states[ShowQuestion]->assignProperty(&d.proxy, "progressBarColor", Qt::green);
-    d.states[ShowQuestion]->assignProperty(&d.proxy, "backgroundColor", Qt::blue);
-    d.states[ShowQuestion]->assignProperty(&d.proxy, "color", Qt::white);
+//     d.states[ShowQuestion]->assignProperty(&d.proxy, "answerProgress", 1.0);
+//     d.states[ShowQuestion]->assignProperty(&d.proxy, "progressBarColor", Qt::green);
+    d.states[ShowQuestion]->assignProperty(&d.proxy, "backgroundColor", Qt::yellow);
+    d.states[ShowQuestion]->assignProperty(&d.proxy, "color", Qt::black);
 
 //    d.states[PickTeam]->assignProperty(d.teamProxy, "opacity", 1.0);
-    d.states[PickTeam]->assignProperty(&d.proxy, "answerProgress", 0.0);
+//    d.states[PickTeam]->assignProperty(&d.proxy, "answerProgress", 0.0);
 
     d.states[PickRightOrWrong]->assignProperty(d.rightAnswerItem, "opacity", 1.0);
     d.states[PickRightOrWrong]->assignProperty(d.wrongAnswerItem, "opacity", 1.0);
@@ -140,7 +187,7 @@ GraphicsScene::GraphicsScene(QObject *parent)
 
     d.states[WrongAnswer]->assignProperty(&d.proxy, "backgroundColor", Qt::red);
     d.states[WrongAnswer]->assignProperty(&d.proxy, "color", Qt::black);
-    d.states[WrongAnswer]->assignProperty(&d.proxy, "answerProgress", 0.0);
+//    d.states[WrongAnswer]->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.states[WrongAnswer]->assignProperty(&d.proxy, "yRotation", 0.0);
     d.states[WrongAnswer]->assignProperty(d.rightAnswerItem, "opacity", 0.0);
     d.states[WrongAnswer]->assignProperty(d.wrongAnswerItem, "opacity", 0.0);
@@ -149,14 +196,14 @@ GraphicsScene::GraphicsScene(QObject *parent)
 
     d.states[RightAnswer]->assignProperty(&d.proxy, "backgroundColor", Qt::green);
     d.states[RightAnswer]->assignProperty(&d.proxy, "color", Qt::black);
-    d.states[RightAnswer]->assignProperty(&d.proxy, "answerProgress", 0.0);
+//    d.states[RightAnswer]->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.states[RightAnswer]->assignProperty(&d.proxy, "yRotation", 0.0);
     d.states[RightAnswer]->assignProperty(d.rightAnswerItem, "opacity", 0.0);
     d.states[RightAnswer]->assignProperty(d.wrongAnswerItem, "opacity", 0.0);
 
     d.states[TeamTimedOut]->assignProperty(d.teamProxy, "backgroundColor", Qt::red);
     d.states[TeamTimedOut]->assignProperty(&d.proxy, "color", Qt::black);
-    d.states[RightAnswer]->assignProperty(&d.proxy, "answerProgress", 0.0);
+//    d.states[RightAnswer]->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.states[RightAnswer]->assignProperty(&d.proxy, "yRotation", 0.0);
 
 

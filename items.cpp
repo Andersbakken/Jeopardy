@@ -32,49 +32,6 @@ static inline void initTextLayout(QTextLayout *layout, const QRectF &rect, int p
     }
 }
 
-class TextAnimation : public QPropertyAnimation
-{
-public:
-    TextAnimation(QObject *o, const QByteArray &propertyName)
-        : QPropertyAnimation(o, propertyName)
-    {}
-    virtual QVariant interpolated(const QVariant &from, const QVariant &to, qreal progress) const
-    {
-        if (qFuzzyIsNull(progress)) {
-            return from;
-        } else if (qFuzzyCompare(progress, 1.0)) {
-            return to;
-        }
-
-#if 0
-        if (progress < .5) {
-            QString fromString = from.toString();
-            const int letters = fromString.size() * (progress * 2);
-            fromString.chop(letters);
-            return fromString;
-        } else {
-            const QString toString = to.toString();
-            const int letters = toString.size() * ((progress - 0.5) * 2);
-            return toString.mid(letters);
-        }
-#else
-        QString fromString = from.toString();
-        const QString toString = to.toString();
-        const int letters = fromString.size() + toString.size();
-        const int current = letters * progress;
-        if (current == fromString.size()) {
-            return QString();
-        } else if (current < fromString.size()) {
-            fromString.chop(current);
-            return fromString;
-        }
-        return toString.mid(toString.size() - (current - fromString.size()));
-#endif
-    }
-private:
-    QGraphicsWidget *widget;
-};
-
 Item::Item()
 {
     setCacheMode(ItemCoordinateCache);
