@@ -121,7 +121,7 @@ public:
     void setPoints(int points) { d.points = points; updatePoints(); }
     void addPoints(int points) { d.points += points; updatePoints(); }
 private:
-    void updatePoints() { setText(QString("%1 - %2$").arg(objectName()).arg(points())); }
+    void updatePoints() { setText(QString("%1 %2$").arg(objectName()).arg(points())); }
     struct Data {
         int points;
     } d;
