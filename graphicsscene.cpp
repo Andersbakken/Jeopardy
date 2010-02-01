@@ -336,10 +336,10 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
     d.states[PickTeam]->assignProperty(d.cancelTeam, "visible", true);
     d.states[PickRightOrWrong]->assignProperty(d.cancelTeam, "visible", false);
 
-
     d.cancelTeam->setZValue(100.0);
     d.cancelTeam->setBackgroundColor(Qt::black);
     d.cancelTeam->setColor(Qt::red);
+    d.cancelTeam->setVisible(false);
 
     d.teams.append(d.cancelTeam);
     addItem(d.cancelTeam);
@@ -610,7 +610,6 @@ void GraphicsScene::onStateEntered()
         Q_ASSERT(!d.teamProxy->activeTeam());
         d.currentFrame->setStatus(Frame::Failed);
         finishQuestion();
-        emit nextState();
         break;
     case RightAnswer:
         ++d.right;
@@ -621,7 +620,6 @@ void GraphicsScene::onStateEntered()
 //                      << "$. They now have" << d.teamProxy->activeTeam()->score << "$";
         d.currentFrame->setStatus(Frame::Succeeded);
         finishQuestion();
-        emit nextState();
         break;
     case Finished:
         qSort(d.teams.end(), d.teams.begin(), compareTeamsByScore);
