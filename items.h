@@ -3,20 +3,6 @@
 
 #include <QtGui>
 
-//class GraphicsScene;
-// class Position
-// {
-// public:
-//     enum Type { Absolute,
-//     Position(const Position &other) { operator=(other); }
-//     Position &operator=(const Position &other) {
-//     Position(const QRectF &absolute) { operator=(other); }
-//     QRectF rect(const GraphicsScene *scene) const;
-//     private:
-//     struct Data {
-
-//     } d;
-// };
 class GraphicsScene;
 class Item : public QGraphicsWidget
 {

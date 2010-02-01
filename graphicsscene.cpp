@@ -61,9 +61,11 @@ private:
 };
 
 
+
 GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
+    qRegisterMetaType<StateType>("StateType");
     d.elapsed = 0;
     d.currentState = 0;
     d.cancelTeam = 0;
@@ -71,7 +73,7 @@ GraphicsScene::GraphicsScene(QObject *parent)
     addItem(d.statusBar);
     d.statusBar->setMaximum(100);
     d.statusBar->setValue(45);
-    connect(&d.timeoutTimer, SIGNAL(timeout()), this, SIGNAL(nextStateTimeOut()));
+    connect(&d.timeoutTimer, SIGNAL(timeout()), this, SLOT(nextStateTimeOut()));
 
     d.wrongAnswerItem = new Item;
     d.wrongAnswerItem->setOpacity(0.0);
@@ -106,8 +108,7 @@ GraphicsScene::GraphicsScene(QObject *parent)
         "RightAnswer", "NoAnswers", "Finished", 0
     };
     for (int i=0; states[i]; ++i) {
-        QState *state = new QState(&d.stateMachine);
-        state->setProperty("type", i);
+        State *state = new State(static_cast<StateType>(i), &d.stateMachine);
         connect(state, SIGNAL(entered()), this, SLOT(onStateEntered()));
         connect(state, SIGNAL(exited()), this, SLOT(onStateExited()));
         state->setObjectName(states[i]);
@@ -130,19 +131,19 @@ GraphicsScene::GraphicsScene(QObject *parent)
     rightWrongOpacityGroup->addAnimation(new QPropertyAnimation(d.rightAnswerItem, "opacity"));
     rightWrongOpacityGroup->addAnimation(new QPropertyAnimation(d.wrongAnswerItem, "opacity"));
 
-    addTransition(Normal, SIGNAL(nextState()), ShowQuestion);
+    addTransition(Normal, ShowQuestion);
 //    normalToShowQuestion->addAnimation(proxyGroup);
-    addTransition(ShowQuestion, SIGNAL(nextStateTimeOut()), TimeOut);
-    addTransition(ShowQuestion, SIGNAL(nextState()), PickTeam);
+    addTransition(ShowQuestion, TimeOut);
+    addTransition(ShowQuestion, PickTeam);
 //    showQuestionToPickTeam->addAnimation(teamProxyGroup);
-    addTransition(TimeOut, SIGNAL(nextState()), Normal);
-    addTransition(TimeOut, SIGNAL(nextStateFinished()), Finished);
-    addTransition(PickTeam, SIGNAL(nextStateTimeOut()), NoAnswers);
+    addTransition(TimeOut, Normal);
+    addTransition(TimeOut, Finished);
+    addTransition(PickTeam, NoAnswers);
 
-    addTransition(NoAnswers, SIGNAL(nextState()), Normal);
-    addTransition(NoAnswers, SIGNAL(nextStateFinished()), Finished);
+    addTransition(NoAnswers, Normal);
+    addTransition(NoAnswers, Finished);
 
-    addTransition(PickTeam, SIGNAL(nextState()), PickRightOrWrong);
+    addTransition(PickTeam, PickRightOrWrong);
     {
         QSequentialAnimationGroup *sequential = new QSequentialAnimationGroup(this);
         sequential->addAnimation(teamProxyGroup);
@@ -151,14 +152,15 @@ GraphicsScene::GraphicsScene(QObject *parent)
 //        pickTeamToPickRightOrWrong->addAnimation(sequential);
     }
 
-    addTransition(TeamTimedOut, SIGNAL(nextState()), ShowQuestion);
-    addTransition(PickRightOrWrong, SIGNAL(nextStateRight()), RightAnswer);
-    addTransition(PickRightOrWrong, SIGNAL(nextStateWrong()), WrongAnswer);
-    addTransition(RightAnswer, SIGNAL(nextState()), Normal);
-    addTransition(RightAnswer, SIGNAL(nextStateFinished()), Finished);
-    addTransition(WrongAnswer, SIGNAL(nextState()), ShowQuestion);
-    addTransition(WrongAnswer, SIGNAL(nextStateFinished()), Finished);
-    addTransition(PickTeam, SIGNAL(nextStateWrong()), WrongAnswer);
+    addTransition(TeamTimedOut, ShowQuestion);
+    addTransition(PickRightOrWrong, RightAnswer);
+    addTransition(PickRightOrWrong, WrongAnswer);
+    addTransition(RightAnswer, Normal);
+    addTransition(RightAnswer, Finished);
+    addTransition(WrongAnswer, ShowQuestion);
+    addTransition(WrongAnswer, Normal);
+    addTransition(WrongAnswer, Finished);
+    addTransition(PickTeam, WrongAnswer);
 
     d.states[Normal]->assignProperty(&d.proxy, "yRotation", 0.0);
 //    d.states[Normal]->assignProperty(&d.proxy, "answerProgress", 0.0);
@@ -419,18 +421,6 @@ void GraphicsScene::reset()
     addItem(d.statusBar);
 }
 
-void GraphicsScene::keyPressEvent(QKeyEvent *e)
-{
-    switch (e->key()) {
-    case Qt::Key_Space:
-        emit spaceBarPressed();
-        break;
-    default:
-        break;
-    }
-    e->accept();
-}
-
 void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *e)
 {
     emit mouseButtonPressed(e->scenePos(), e->button());
@@ -446,8 +436,10 @@ QRectF GraphicsScene::frameGeometry(Frame *frame) const
 void GraphicsScene::onClicked(Item *item)
 {
     if (d.currentState && item) {
-        const int type = d.currentState->property("type").toInt();
+        const StateType type = d.currentState->type();
         switch (type) {
+        case NoAnswers:
+            break;
         case Normal:
             if (Frame *frame = qgraphicsitem_cast<Frame*>(item)) {
                 if (frame->status() != Frame::Hidden)
@@ -462,14 +454,14 @@ void GraphicsScene::onClicked(Item *item)
                 d.states[RightAnswer]->assignProperty(&d.proxy, "geometry", r);
                 d.states[WrongAnswer]->assignProperty(&d.proxy, "text", QString("%1 is the answer :-(").arg(frame->answer()));
                 d.states[WrongAnswer]->assignProperty(&d.proxy, "geometry", r);
-                emit nextState();
+                emit next(ShowQuestion);
             }
             break;
         case ShowQuestion:
             if (item == d.currentFrame) {
                 d.elapsed += d.timeoutTimerStarted.msecsTo(QTime::currentTime());
                 d.timeoutTimer.stop();
-                emit nextState();
+                emit next(PickTeam);
             }
             break;
         case TimeOut:
@@ -477,12 +469,12 @@ void GraphicsScene::onClicked(Item *item)
         case PickTeam:
             if (Team *team = qgraphicsitem_cast<Team*>(item)) {
                 if (team == d.cancelTeam) {
-                    emit nextStateTimeOut();
+                    emit next(NoAnswers);
                 } else if (team->acceptsHoverEvents()) {
                     item->d.hovered = false; // hack
                     team->update();
                     d.teamProxy->setActiveTeam(team);
-                    emit nextState();
+                    emit next(PickRightOrWrong);
                 }
             }
             break;
@@ -490,9 +482,9 @@ void GraphicsScene::onClicked(Item *item)
             break;
         case PickRightOrWrong:
             if (item == d.rightAnswerItem) {
-                emit nextStateRight();
+                emit next(RightAnswer);
             } else if (item == d.wrongAnswerItem) {
-                emit nextStateWrong();
+                emit next(WrongAnswer);
             }
             break;
         case WrongAnswer:
@@ -518,7 +510,7 @@ void GraphicsScene::clearActiveFrame()
     d.proxy.activeFrame()->setFlag(QGraphicsItem::ItemIsSelectable, false);
     // ### add/remove score here
     d.proxy.setActiveFrame(static_cast<Frame*>(0));
-    emit normalState();
+    emit next(Normal);
 }
 
 void GraphicsScene::onTransitionTriggered()
@@ -553,9 +545,9 @@ static inline bool compareTeamsByScore(const Team *left, const Team *right)
 
 void GraphicsScene::onStateEntered()
 {
-    d.currentState = qobject_cast<QState*>(sender());
+    d.currentState = qobject_cast<State*>(sender());
     qDebug() << d.currentState->objectName() << "entered";
-    const int type = d.currentState->property("type").toInt();
+    const StateType type = d.currentState->type();
     switch (type) {
     case Normal:
         Q_ASSERT(d.teamsAttempted.isEmpty());
@@ -567,7 +559,7 @@ void GraphicsScene::onStateEntered()
     case ShowQuestion: {
 //        d.timeoutTimer.start(5000 - d.elapsed);
         if (d.teamsAttempted.size() == d.teams.size()) {
-            emit nextStateTimeOut();
+            emit next(TimeOut);
         } else {
             Q_ASSERT(d.currentFrame);
 //                 qDebug() << "showing question" << d.currentFrame->question
@@ -596,12 +588,11 @@ void GraphicsScene::onStateEntered()
         Q_ASSERT(d.currentFrame);
         d.teamProxy->activeTeam()->addPoints(-d.currentFrame->value() / 2);
         d.currentFrame->setStatus(Frame::Failed);
-        if (d.teamsAttempted.size() + 1 == d.teams.size()) {
+        if (d.teamsAttempted.size() + 2 == d.teams.size()) {
             finishQuestion();
         } else {
             d.teamsAttempted.insert(d.teamProxy->activeTeam());
-//            d.teamProxy->setActiveTeam(0);
-            emit nextState();
+            emit next(ShowQuestion);
         }
         break;
     case NoAnswers:
@@ -629,14 +620,18 @@ void GraphicsScene::onStateEntered()
         qDebug() << "right" << d.right << "wrong" << d.wrong << "timedout" << d.timedout;
         d.stateMachine.stop();
         break;
+    case PickRightOrWrong:
+        break;
+    case NumStates:
+        break;
     }
 //        qDebug() << sender()->objectName() << "entered";
 }
 
 void GraphicsScene::onStateExited()
 {
-    QState *state = qobject_cast<QState*>(sender());
-    const int type = state->property("type").toInt();
+    State *state = qobject_cast<State*>(sender());
+    const StateType type = state->type();
     switch (type) {
     case PickTeam:
         foreach(Team *team, d.teams)
@@ -670,29 +665,33 @@ void GraphicsScene::finishQuestion()
     d.currentFrame = 0;
     d.teamsAttempted.clear();
     if (d.framesLeft == 0) {
-        emit nextStateFinished();
-    }  else {
-        emit nextState();
+        emit next(Finished);
+    } else {
+        emit next(Normal);
     }
 }
 
-QAbstractTransition *GraphicsScene::transition(StateType from, StateType to) const
+Transition *GraphicsScene::transition(StateType from, StateType to) const
 {
     Q_ASSERT(from != to);
-    QState *state = d.states[from];
+    State *state = d.states[from];
     Q_ASSERT(state);
-    return qVariantValue<TransitionHash>(state->property("transitions")).value(to);
+    return state->transition(to);
 }
 
-QAbstractTransition *GraphicsScene::addTransition(StateType from, const char *sig, StateType to)
+Transition *GraphicsScene::addTransition(StateType from, StateType to)
 {
     Q_ASSERT(!transition(from, to));
-    QState *fromState = d.states[from];
-    QState *toState = d.states[to];
+    State *fromState = d.states[from];
+    State *toState = d.states[to];
     Q_ASSERT(fromState && toState && fromState != toState);
-    QAbstractTransition *transition = fromState->addTransition(this, sig, toState);
-    TransitionHash transitions = qVariantValue<TransitionHash>(fromState->property("transitions"));
-    transitions[to] = transition;
-    fromState->setProperty("transitions", qVariantFromValue(transitions));
+    Transition *transition = new Transition(this, toState);
+    fromState->addTransition(to, transition);
     return transition;
+}
+
+void State::addTransition(StateType type, Transition *transition)
+{
+    d.transitions[type] = transition;
+    QState::addTransition(transition);
 }

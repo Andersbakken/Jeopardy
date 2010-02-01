@@ -18,7 +18,45 @@ enum StateType {
     NumStates
 };
 
-typedef QHash<StateType, QAbstractTransition*> TransitionHash;
+class Transition;
+class State : public QState
+{
+    Q_OBJECT
+    Q_PROPERTY(StateType type READ type WRITE setType)
+public:
+    State(StateType type, QState *parent) : QState(parent) { d.type = type; }
+    StateType type() const { return d.type; }
+    void setType(StateType type) { d.type = type; }
+    Transition *transition(StateType type) const { return d.transitions.value(type); }
+    void addTransition(StateType type, Transition *transition);
+private:
+    struct Data {
+        QHash<StateType, Transition *> transitions;
+        StateType type;
+    } d;
+};
+
+class Transition : public QSignalTransition
+{
+    Q_OBJECT
+public:
+    Transition(QObject *sender, State *target)
+        : QSignalTransition(sender, SIGNAL(next(int)))
+    {
+        setTargetState(target);
+    }
+    bool eventTest(QEvent *event)
+    {
+        if (QSignalTransition::eventTest(event)) {
+            QStateMachine::SignalEvent *se = static_cast<QStateMachine::SignalEvent*>(event);
+            Q_ASSERT(qobject_cast<State*>(targetState()));
+            return (se->arguments().value(0).toInt() == qobject_cast<State*>(targetState())->type());
+        }
+        return false;
+    }
+};
+
+typedef QHash<StateType, Transition*> TransitionHash;
 Q_DECLARE_METATYPE(TransitionHash);
 class GraphicsScene : public QGraphicsScene
 {
@@ -27,26 +65,13 @@ public:
     GraphicsScene(QObject *parent = 0);
     bool load(QIODevice *device, const QStringList &teams);
     void reset();
-    void keyPressEvent(QKeyEvent *e);
     void mousePressEvent(QGraphicsSceneMouseEvent *e);
     QRectF frameGeometry(Frame *frame) const;
     int answerTime() const;
     void setTeamGeometry(const QRectF &rect);
 signals:
-    void normalState();
-    void spaceBarPressed();
-    void rightAnswer();
-    void wrongAnswer();
-    void showQuestion();
-    void showAnswer();
-    void teamPicked();
+    void next(int type);
     void mouseButtonPressed(const QPointF &, Qt::MouseButton);
-
-    void nextState();
-    void nextStateWrong();
-    void nextStateRight();
-    void nextStateTimeOut();
-    void nextStateFinished();
 public slots:
     bool load(const QString &file, const QStringList &teams = QStringList())
     { QFile f(file); return f.open(QIODevice::ReadOnly) && load(&f, teams); }
@@ -56,15 +81,16 @@ public slots:
     void onTransitionTriggered();
     void onStateEntered();
     void onStateExited();
+    void nextStateTimeOut() { emit next(TimeOut); }
 private:
     void finishQuestion();
-    QAbstractTransition *transition(StateType from, StateType to) const;
-    QAbstractTransition *addTransition(StateType from, const char *sig, StateType to);
+    Transition *transition(StateType from, StateType to) const;
+    Transition *addTransition(StateType from, StateType to);
 
     struct Data {
         QStateMachine stateMachine;
-        QState *states[NumStates];
-        QState *currentState;
+        State *states[NumStates];
+        State *currentState;
         QList<Team*> teams;
         Team *cancelTeam;
         QSet<Team*> teamsAttempted;
