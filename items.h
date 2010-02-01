@@ -29,7 +29,7 @@ public:
     virtual void draw(QPainter *, const QRect &) {}
     virtual void hoverEnterEvent(QGraphicsSceneHoverEvent *event);
     virtual void hoverLeaveEvent(QGraphicsSceneHoverEvent *event);
-
+    virtual QVariant itemChange(GraphicsItemChange change, const QVariant &value);
 signals:
     void clicked(Item *item, const QPointF &scenePos);
 private:

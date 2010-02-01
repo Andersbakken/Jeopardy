@@ -224,3 +224,10 @@ void StatusBar::setValue(int value)
         setText(QString("%1%%").arg(progress * 100));
     }
 }
+QVariant Item::itemChange(GraphicsItemChange change, const QVariant &value)
+{
+    if (change == ItemVisibleChange && !value.toBool()) {
+        d.hovered = false;
+    }
+    return QGraphicsWidget::itemChange(change, value);
+}
