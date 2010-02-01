@@ -4,6 +4,22 @@
 #include <QtGui>
 #include "items.h"
 
+enum StateType {
+    Normal = 0,
+    ShowQuestion,
+    TimeOut,
+    PickTeam,
+    TeamTimedOut,
+    PickRightOrWrong,
+    WrongAnswer,
+    RightAnswer,
+    NoAnswers,
+    Finished,
+    NumStates
+};
+
+typedef QHash<StateType, QAbstractTransition*> TransitionHash;
+Q_DECLARE_METATYPE(TransitionHash);
 class GraphicsScene : public QGraphicsScene
 {
     Q_OBJECT
@@ -42,24 +58,15 @@ public slots:
     void onStateExited();
 private:
     void finishQuestion();
-    enum StateType {
-        Normal = 0,
-        ShowQuestion,
-        TimeOut,
-        PickTeam,
-        TeamTimedOut,
-        PickRightOrWrong,
-        WrongAnswer,
-        RightAnswer,
-        Finished,
-        NumStates
-    };
+    QAbstractTransition *transition(StateType from, StateType to) const;
+    QAbstractTransition *addTransition(StateType from, const char *sig, StateType to);
 
     struct Data {
         QStateMachine stateMachine;
         QState *states[NumStates];
         QState *currentState;
         QList<Team*> teams;
+        Team *cancelTeam;
         QSet<Team*> teamsAttempted;
 
         QList<Frame*> frames;

@@ -66,6 +66,7 @@ GraphicsScene::GraphicsScene(QObject *parent)
 {
     d.elapsed = 0;
     d.currentState = 0;
+    d.cancelTeam = 0;
     d.statusBar = new StatusBar;
     addItem(d.statusBar);
     d.statusBar->setMaximum(100);
@@ -102,7 +103,7 @@ GraphicsScene::GraphicsScene(QObject *parent)
     const char *states[] = {
         "Normal", "ShowQuestion", "TimeOut", "PickTeam",
         "TeamTimedOut", "PickRightOrWrong", "WrongAnswer",
-        "RightAnswer", "Finished", 0
+        "RightAnswer", "NoAnswers", "Finished", 0
     };
     for (int i=0; states[i]; ++i) {
         QState *state = new QState(&d.stateMachine);
@@ -129,43 +130,35 @@ GraphicsScene::GraphicsScene(QObject *parent)
     rightWrongOpacityGroup->addAnimation(new QPropertyAnimation(d.rightAnswerItem, "opacity"));
     rightWrongOpacityGroup->addAnimation(new QPropertyAnimation(d.wrongAnswerItem, "opacity"));
 
-    QAbstractTransition *normalToShowQuestion = d.states[Normal]->addTransition(this, SIGNAL(nextState()), d.states[ShowQuestion]);
-    normalToShowQuestion->addAnimation(proxyGroup);
-    d.states[ShowQuestion]->addTransition(this, SIGNAL(nextStateTimeOut()),
-                                          d.states[TimeOut]);
-    QAbstractTransition *showQuestionToPickTeam = d.states[ShowQuestion]->addTransition(this, SIGNAL(nextState()),
-                                                                                        d.states[PickTeam]);
-    showQuestionToPickTeam->addAnimation(teamProxyGroup);
-    d.states[TimeOut]->addTransition(this, SIGNAL(nextState()),
-                                     d.states[Normal]);
-    d.states[TimeOut]->addTransition(this, SIGNAL(nextStateFinished()),
-                                     d.states[Finished]);
-//     d.states[PickTeam]->addTransition(this, SIGNAL(nextStateTimeOut()),
-//                                       d.states[TeamTimedOut]);
-    QAbstractTransition *pickTeamToPickRightOrWrong = d.states[PickTeam]->addTransition(this, SIGNAL(nextState()),
-                                                                                        d.states[PickRightOrWrong]);
+    addTransition(Normal, SIGNAL(nextState()), ShowQuestion);
+//    normalToShowQuestion->addAnimation(proxyGroup);
+    addTransition(ShowQuestion, SIGNAL(nextStateTimeOut()), TimeOut);
+    addTransition(ShowQuestion, SIGNAL(nextState()), PickTeam);
+//    showQuestionToPickTeam->addAnimation(teamProxyGroup);
+    addTransition(TimeOut, SIGNAL(nextState()), Normal);
+    addTransition(TimeOut, SIGNAL(nextStateFinished()), Finished);
+    addTransition(PickTeam, SIGNAL(nextStateTimeOut()), NoAnswers);
+
+    addTransition(NoAnswers, SIGNAL(nextState()), Normal);
+    addTransition(NoAnswers, SIGNAL(nextStateFinished()), Finished);
+
+    addTransition(PickTeam, SIGNAL(nextState()), PickRightOrWrong);
     {
         QSequentialAnimationGroup *sequential = new QSequentialAnimationGroup(this);
         sequential->addAnimation(teamProxyGroup);
         sequential->addPause(200);
         sequential->addAnimation(rightWrongOpacityGroup);
-        pickTeamToPickRightOrWrong->addAnimation(sequential);
+//        pickTeamToPickRightOrWrong->addAnimation(sequential);
     }
 
-    d.states[TeamTimedOut]->addTransition(this, SIGNAL(nextState()),
-                                          d.states[ShowQuestion]);
-    d.states[PickRightOrWrong]->addTransition(this, SIGNAL(nextStateRight()),
-                                              d.states[RightAnswer]);
-    d.states[PickRightOrWrong]->addTransition(this, SIGNAL(nextStateWrong()),
-                                              d.states[WrongAnswer]);
-    d.states[RightAnswer]->addTransition(this, SIGNAL(nextState()),
-                                         d.states[Normal]);
-    d.states[RightAnswer]->addTransition(this, SIGNAL(nextStateFinished()),
-                                         d.states[Finished]);
-    d.states[WrongAnswer]->addTransition(this, SIGNAL(nextState()),
-                                         d.states[ShowQuestion]);
-    d.states[WrongAnswer]->addTransition(this, SIGNAL(nextStateFinished()),
-                                         d.states[Normal]);
+    addTransition(TeamTimedOut, SIGNAL(nextState()), ShowQuestion);
+    addTransition(PickRightOrWrong, SIGNAL(nextStateRight()), RightAnswer);
+    addTransition(PickRightOrWrong, SIGNAL(nextStateWrong()), WrongAnswer);
+    addTransition(RightAnswer, SIGNAL(nextState()), Normal);
+    addTransition(RightAnswer, SIGNAL(nextStateFinished()), Finished);
+    addTransition(WrongAnswer, SIGNAL(nextState()), ShowQuestion);
+    addTransition(WrongAnswer, SIGNAL(nextStateFinished()), Finished);
+    addTransition(PickTeam, SIGNAL(nextStateWrong()), WrongAnswer);
 
     d.states[Normal]->assignProperty(&d.proxy, "yRotation", 0.0);
 //    d.states[Normal]->assignProperty(&d.proxy, "answerProgress", 0.0);
@@ -213,150 +206,6 @@ GraphicsScene::GraphicsScene(QObject *parent)
 
 //    d.states[RightAnswer]->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.states[RightAnswer]->assignProperty(&d.proxy, "yRotation", 0.0);
-
-
-#if 0
-    enum { Duration = 1000 };
-    {
-        QSequentialAnimationGroup *sequential = new QSequentialAnimationGroup(&d.stateMachine);
-        QParallelAnimationGroup *parallel = new QParallelAnimationGroup;
-        QPropertyAnimation *geometryAnimation = new QPropertyAnimation(&d.proxy, "geometry");
-        geometryAnimation->setDuration(Duration);
-        parallel->addAnimation(geometryAnimation);
-        QPropertyAnimation *yRotationAnimation = new QPropertyAnimation(&d.proxy, "yRotation");
-        yRotationAnimation->setDuration(Duration);
-        parallel->addAnimation(yRotationAnimation);
-        sequential->addAnimation(parallel);
-        sequential->addPause(500);
-        TextAnimation *textAnimation = new TextAnimation(&d.proxy, "text");
-        textAnimation->setDuration(Duration);
-        sequential->addAnimation(textAnimation);
-
-//         QParallelAnimationGroup *answerProgressGroup = new QParallelAnimationGroup;
-//         QPropertyAnimation *answerProgressAnimation = new QPropertyAnimation(&d.proxy, "answerProgress");
-//         answerProgressAnimation->setDuration(d.answerTime);
-//         answerProgressGroup->addAnimation(answerProgressAnimation);
-
-//         QPropertyAnimation *progressBarColorAnimation = new QPropertyAnimation(&d.proxy, "progressBarColor");
-//         answerProgressAnimation->setDuration(d.answerTime);
-//         answerProgressGroup->addAnimation(progressBarColorAnimation);
-
-//         sequential->addAnimation(answerProgressGroup);
-
-        QAbstractTransition *showQuestionTransition = d.states[Normal]->addTransition(this, SIGNAL(showQuestion()), d.states[ShowQuestion]);
-        FOO(showQuestionTransition);
-        showQuestionTransition->addAnimation(sequential);
-        connect(sequential, SIGNAL(finished()), this, SIGNAL(showAnswer()));
-    }
-
-    {
-        QAbstractTransition *showAnswerTransition = d.states[ShowQuestion]->addTransition(this, SIGNAL(showAnswer()), d.states[ShowAnswer]);
-        FOO(showAnswerTransition);
-        TextAnimation *textAnimation = new TextAnimation(&d.proxy, "text");
-        textAnimation->setDuration(Duration);
-        showAnswerTransition->addAnimation(textAnimation);
-    }
-
-    {
-        QSequentialAnimationGroup *sequential = new QSequentialAnimationGroup(&d.stateMachine);
-
-        QParallelAnimationGroup *colorGroup = new QParallelAnimationGroup;
-        QPropertyAnimation *backgroundColorAnimation = new QPropertyAnimation(&d.proxy, "backgroundColor");
-        backgroundColorAnimation->setDuration(Duration);
-        colorGroup->addAnimation(backgroundColorAnimation);
-        QPropertyAnimation *colorAnimation = new QPropertyAnimation(&d.proxy, "color");
-        colorAnimation->setDuration(Duration);
-        colorGroup->addAnimation(colorAnimation);
-        sequential->addAnimation(colorGroup);
-
-        TextAnimation *textAnimation = new TextAnimation(&d.proxy, "text");
-        textAnimation->setDuration(Duration / 2);
-        sequential->addAnimation(textAnimation);
-
-        sequential->addPause(2500);
-
-        QParallelAnimationGroup *parallel = new QParallelAnimationGroup;
-
-        QPropertyAnimation *geometryAnimation = new QPropertyAnimation(&d.proxy, "geometry");
-        geometryAnimation->setDuration(Duration);
-        parallel->addAnimation(geometryAnimation);
-
-        QPropertyAnimation *yRotationAnimation = new QPropertyAnimation(&d.proxy, "yRotation");
-        yRotationAnimation->setDuration(Duration);
-        parallel->addAnimation(yRotationAnimation);
-        sequential->addAnimation(parallel);
-
-        QAbstractTransition *wrongAnswerTransition = d.states[PickRightOrWrong]->addTransition(this, SIGNAL(wrongAnswer()), d.states[WrongAnswer]);
-        wrongAnswerTransition->addAnimation(sequential);
-
-        QAbstractTransition *rightAnswerTransition = d.states[PickRightOrWrong]->addTransition(this, SIGNAL(rightAnswer()), d.states[RightAnswer]);
-        FOO(rightAnswerTransition);
-        rightAnswerTransition->addAnimation(sequential);
-
-        connect(sequential, SIGNAL(finished()), this, SLOT(clearActiveFrame()));
-    }
-
-    {
-//         QPropertyAnimation *opacityAnimation = new QPropertyAnimation(d.teamProxy, "opacity");
-//         opacityAnimation->setDuration(Duration / 2);
-        QPropertyAnimation *rectAnimation = new QPropertyAnimation(d.teamProxy, "rect");
-        rectAnimation->setDuration(Duration / 2);
-        QAbstractTransition *pickTeamTransition = d.states[ShowQuestion]->addTransition(this,
-                                                                                        SIGNAL(mouseButtonPressed(QPointF,Qt::MouseButton)),
-                                                                                        d.states[PickTeam]);
-        FOO(pickTeamTransition);
-//        pickTeamTransition->addAnimation(opacityAnimation);
-        pickTeamTransition->addAnimation(rectAnimation);
-    }
-
-#if 0
-    {
-        QSequentialAnimationGroup *sequential = new QSequentialAnimationGroup;
-        QPropertyAnimation *opacityAnimation = new QPropertyAnimation(d.teamProxy, "opacity");
-        opacityAnimation->setDuration(Duration / 2);
-        sequential->addAnimation(opacityAnimation);
-
-        QParallelAnimationGroup *parallel = new QParallelAnimationGroup;
-        QPropertyAnimation *backgroundColorAnimation = new QPropertyAnimation(&d.proxy, "backgroundColor");
-        backgroundColorAnimation->setDuration(Duration);
-        parallel->addAnimation(backgroundColorAnimation);
-
-        QPropertyAnimation *colorAnimation = new QPropertyAnimation(&d.proxy, "color");
-        colorAnimation->setDuration(Duration);
-        parallel->addAnimation(colorAnimation);
-        sequential->addAnimation(parallel);
-
-//         QPropertyAnimation *answerProgressAnimation = new QPropertyAnimation(&d.proxy, "answerProgress");
-//         answerProgressAnimation->setDuration(d.answerTime);
-//         sequential->addAnimation(answerProgressAnimation);
-//         connect(answerProgressAnimation, SIGNAL(finished()), this, SIGNAL(wrongAnswer()));
-
-        QAbstractTransition *answerTransition = states[PickTeam]->addTransition(this, SIGNAL(teamPicked()), d.states[PickRightOrWrong]);
-        FOO(answerTransition);
-        answerTransition->addAnimation(sequential);
-    }
-#endif
-    {
-        QSequentialAnimationGroup *sequential = new QSequentialAnimationGroup;
-        QPropertyAnimation *rectAnimation = new QPropertyAnimation(d.teamProxy, "rect");
-        rectAnimation->setDuration(Duration / 2);
-        sequential->addAnimation(rectAnimation);
-
-        QParallelAnimationGroup *parallel = new QParallelAnimationGroup;
-        QPropertyAnimation *opacityAnimation = new QPropertyAnimation(d.rightAnswerItem, "opacity");
-        opacityAnimation->setDuration(Duration / 2);
-        parallel->addAnimation(opacityAnimation);
-        opacityAnimation = new QPropertyAnimation(d.wrongAnswerItem, "opacity");
-        opacityAnimation->setDuration(Duration / 2);
-        parallel->addAnimation(opacityAnimation);
-        sequential->addAnimation(parallel);
-
-        QAbstractTransition *answerTransition = d.states[PickTeam]->addTransition(this, SIGNAL(teamPicked()), d.states[PickRightOrWrong]);
-        FOO(answerTransition);
-        answerTransition->addAnimation(sequential);
-    }
-
-#endif
 
     d.stateMachine.setInitialState(d.states[Normal]);
     d.stateMachine.start();
@@ -480,6 +329,20 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
         d.teams.append(team);
         addItem(team);
     }
+
+    d.cancelTeam = new Team(tr("Cancel"));
+    connect(d.cancelTeam, SIGNAL(clicked(Item*, QPointF)), this, SLOT(onClicked(Item*)));
+    d.states[Normal]->assignProperty(d.cancelTeam, "visible", false);
+    d.states[PickTeam]->assignProperty(d.cancelTeam, "visible", true);
+    d.states[PickRightOrWrong]->assignProperty(d.cancelTeam, "visible", false);
+
+
+    d.cancelTeam->setZValue(100.0);
+    d.cancelTeam->setBackgroundColor(Qt::black);
+    d.cancelTeam->setColor(Qt::red);
+
+    d.teams.append(d.cancelTeam);
+    addItem(d.cancelTeam);
     d.teamProxy->setTeams(d.teams);
 
     onSceneRectChanged(sceneRect());
@@ -613,7 +476,9 @@ void GraphicsScene::onClicked(Item *item)
             break;
         case PickTeam:
             if (Team *team = qgraphicsitem_cast<Team*>(item)) {
-                if (team->acceptsHoverEvents()) {
+                if (team == d.cancelTeam) {
+                    emit nextStateTimeOut();
+                } else if (team->acceptsHoverEvents()) {
                     item->d.hovered = false; // hack
                     team->update();
                     d.teamProxy->setActiveTeam(team);
@@ -665,12 +530,20 @@ void GraphicsScene::setTeamGeometry(const QRectF &rect)
 {
     d.teamsGeometry = rect;
     Q_ASSERT(!d.teams.isEmpty());
+    int count = d.teams.size();
+    for (int i=count - 1; i>=0; --i) {
+        if (!d.teams.at(i)->isVisible())
+            --count;
+    }
+
     enum { Margin = 2 };
     QRectF r = rect;
-    r.setWidth((rect.width() / d.teams.size()) - Margin);
+    r.setWidth((rect.width() / count) - Margin);
     for (int i=0; i<d.teams.size(); ++i) {
-        d.teams.at(i)->setGeometry(r);
-        r.translate(r.width() + Margin, 0);
+        if (d.teams.at(i)->isVisible()) {
+            d.teams.at(i)->setGeometry(r);
+            r.translate(r.width() + Margin, 0);
+        }
     }
 }
 static inline bool compareTeamsByScore(const Team *left, const Team *right)
@@ -705,11 +578,6 @@ void GraphicsScene::onStateEntered()
         Q_ASSERT(d.currentFrame);
         d.currentFrame->setStatus(Frame::Failed);
         finishQuestion();
-        if (d.framesLeft == 0) {
-            emit nextStateFinished();
-        } else {
-            emit nextState();
-        }
         break;
     case PickTeam:
         d.teamProxy->setActiveTeam(0);
@@ -730,12 +598,19 @@ void GraphicsScene::onStateEntered()
         d.currentFrame->setStatus(Frame::Failed);
         if (d.teamsAttempted.size() + 1 == d.teams.size()) {
             finishQuestion();
-            emit nextStateFinished();
         } else {
             d.teamsAttempted.insert(d.teamProxy->activeTeam());
 //            d.teamProxy->setActiveTeam(0);
             emit nextState();
         }
+        break;
+    case NoAnswers:
+        ++d.wrong;
+        Q_ASSERT(d.currentFrame);
+        Q_ASSERT(!d.teamProxy->activeTeam());
+        d.currentFrame->setStatus(Frame::Failed);
+        finishQuestion();
+        emit nextState();
         break;
     case RightAnswer:
         ++d.right;
@@ -768,7 +643,6 @@ void GraphicsScene::onStateExited()
     case PickTeam:
         foreach(Team *team, d.teams)
             team->setAcceptHoverEvents(false);
-        Q_ASSERT(d.teamProxy->activeTeam());
         break;
 
     case Normal: {
@@ -797,7 +671,30 @@ void GraphicsScene::finishQuestion()
     static_cast<Item*>(d.currentFrame)->d.hovered = false; // ### hack
     d.currentFrame = 0;
     d.teamsAttempted.clear();
-    if (d.framesLeft == 0)
+    if (d.framesLeft == 0) {
         emit nextStateFinished();
+    }  else {
+        emit nextState();
+    }
 }
 
+QAbstractTransition *GraphicsScene::transition(StateType from, StateType to) const
+{
+    Q_ASSERT(from != to);
+    QState *state = d.states[from];
+    Q_ASSERT(state);
+    return qVariantValue<TransitionHash>(state->property("transitions")).value(to);
+}
+
+QAbstractTransition *GraphicsScene::addTransition(StateType from, const char *sig, StateType to)
+{
+    Q_ASSERT(!transition(from, to));
+    QState *fromState = d.states[from];
+    QState *toState = d.states[to];
+    Q_ASSERT(fromState && toState && fromState != toState);
+    QAbstractTransition *transition = fromState->addTransition(this, sig, toState);
+    TransitionHash transitions = qVariantValue<TransitionHash>(fromState->property("transitions"));
+    transitions[to] = transition;
+    fromState->setProperty("transitions", qVariantFromValue(transitions));
+    return transition;
+}
