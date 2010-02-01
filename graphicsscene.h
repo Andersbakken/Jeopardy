@@ -68,7 +68,7 @@ public:
     void mousePressEvent(QGraphicsSceneMouseEvent *e);
     QRectF frameGeometry(Frame *frame) const;
     int answerTime() const;
-    void setTeamGeometry(const QRectF &rect);
+    void setTeamGeometry(const QRectF &rect, Qt::Orientation orientation);
 signals:
     void next(int type);
     void mouseButtonPressed(const QPointF &, Qt::MouseButton);

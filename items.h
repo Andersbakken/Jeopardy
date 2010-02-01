@@ -80,7 +80,7 @@ public:
     int row() const { return d.row; }
     int column() const { return d.column; }
 
-    void setValue(int value) { d.value = value; d.valueString = QString("%1$").arg(d.value); }
+    void setValue(int value) { d.value = value; d.valueString = QString("$%1").arg(d.value); }
     int value() const { return d.value; }
     QString valueString() const { return d.valueString; }
 
@@ -122,7 +122,7 @@ public:
     void setPoints(int points) { d.points = points; updatePoints(); }
     void addPoints(int points) { d.points += points; updatePoints(); }
 private:
-    void updatePoints() { setText(QString("%1 %2$").arg(objectName()).arg(points())); }
+    void updatePoints() { setText(QString("%1 $%2").arg(objectName()).arg(points())); }
     struct Data {
         int points;
     } d;
@@ -190,10 +190,11 @@ class TeamProxy : public QObject
     Q_PROPERTY(QRectF geometry READ geometry WRITE setGeometry)
     Q_PROPERTY(QColor backgroundColor READ backgroundColor WRITE setBackgroundColor)
     Q_PROPERTY(QColor color READ color WRITE setColor)
+    Q_PROPERTY(Qt::Orientation orientation READ orientation WRITE setOrientation)
 public:
     TeamProxy(GraphicsScene *scene, QObject *parent = 0)
         : QObject(parent)
-    { d.scene = scene; d.activeTeam = 0; }
+    { d.scene = scene; d.activeTeam = 0; d.orientation = Qt::Horizontal; }
     void setTeams(const QList<Team*> &teams) { d.teams = teams; }
     qreal opacity() const { return d.teams.isEmpty() ? 0.0 : d.teams.at(0)->opacity(); }
     void setOpacity(qreal opacity) { foreach(Item *team, d.teams) team->setOpacity(opacity); }
@@ -205,8 +206,11 @@ public:
     void setColor(const QColor &tt) { Q_ASSERT(d.activeTeam); if (d.activeTeam) { d.activeTeam->setColor(tt); } else { qDebug() << "tried to set it to" << tt; } }
     void setActiveTeam(Team *team) { d.activeTeam = team; }
     Team *activeTeam() const { return d.activeTeam; }
+    Qt::Orientation orientation() const { return d.orientation; }
+    void setOrientation(Qt::Orientation orientation) { d.orientation = orientation; }
 private:
     struct Data {
+        Qt::Orientation orientation;
         GraphicsScene *scene;
         QList<Team*> teams;
         Team *activeTeam;

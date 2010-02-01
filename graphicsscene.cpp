@@ -172,9 +172,10 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.states[ShowQuestion]->assignProperty(&d.proxy, "backgroundColor", Qt::yellow);
     d.states[ShowQuestion]->assignProperty(&d.proxy, "color", Qt::black);
 
-//    d.states[PickTeam]->assignProperty(d.teamProxy, "opacity", 1.0);
+    d.states[PickTeam]->assignProperty(d.teamProxy, "orientation", Qt::Vertical);
 //    d.states[PickTeam]->assignProperty(&d.proxy, "answerProgress", 0.0);
 
+    d.states[PickRightOrWrong]->assignProperty(d.teamProxy, "orientation", Qt::Horizontal);
     d.states[PickRightOrWrong]->assignProperty(d.rightAnswerItem, "opacity", 1.0);
     d.states[PickRightOrWrong]->assignProperty(d.wrongAnswerItem, "opacity", 1.0);
     d.states[PickRightOrWrong]->assignProperty(d.teamProxy, "color", Qt::black);
@@ -200,6 +201,10 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.states[RightAnswer]->assignProperty(d.wrongAnswerItem, "opacity", 0.0);
     d.states[RightAnswer]->assignProperty(&d.proxy, "color", Qt::green);
     d.states[RightAnswer]->assignProperty(&d.proxy, "backgroundColor", Qt::black);
+
+    d.states[NoAnswers]->assignProperty(&d.proxy, "color", Qt::red);
+    d.states[NoAnswers]->assignProperty(&d.proxy, "backgroundColor", Qt::black);
+    d.states[NoAnswers]->assignProperty(d.teamProxy, "orientation", Qt::Horizontal);
 
     d.states[TeamTimedOut]->assignProperty(d.teamProxy, "backgroundColor", Qt::red);
     d.states[TeamTimedOut]->assignProperty(&d.proxy, "color", Qt::black);
@@ -334,7 +339,7 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
 
     d.cancelTeam = new Team(tr("Cancel"));
     connect(d.cancelTeam, SIGNAL(clicked(Item*, QPointF)), this, SLOT(onClicked(Item*)));
-    d.states[Normal]->assignProperty(d.cancelTeam, "visible", false);
+    d.states[NoAnswers]->assignProperty(d.cancelTeam, "visible", false);
     d.states[PickTeam]->assignProperty(d.cancelTeam, "visible", true);
     d.states[PickRightOrWrong]->assignProperty(d.cancelTeam, "visible", false);
 
@@ -385,7 +390,7 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rr)
         frame->setGeometry(r);
     }
 
-    setTeamGeometry(d.teamsGeometry);
+    setTeamGeometry(d.teamsGeometry, Qt::Horizontal);
 //     static QState *const states[] = {
 //         d.states[Normal], d.states[ShowQuestion], d.states[ShowAnswer],
 //         d.states[PickRightOrWrong], d.states[RightAnswer], d.states[WrongAnswer], 0
@@ -518,7 +523,7 @@ void GraphicsScene::onTransitionTriggered()
     qDebug() << sender()->objectName() << "triggered";
 }
 
-void GraphicsScene::setTeamGeometry(const QRectF &rect)
+void GraphicsScene::setTeamGeometry(const QRectF &rect, Qt::Orientation orientation)
 {
     d.teamsGeometry = rect;
     Q_ASSERT(!d.teams.isEmpty());
@@ -530,14 +535,22 @@ void GraphicsScene::setTeamGeometry(const QRectF &rect)
 
     enum { Margin = 2 };
     QRectF r = rect;
-    r.setWidth((rect.width() / count) - Margin);
+    QPointF add;
+    if (orientation == Qt::Vertical) {
+        r.setHeight((rect.height() / count) - Margin);
+        add.ry() = r.height() + Margin;
+    } else {
+        r.setWidth((rect.width() / count) - Margin);
+        add.rx() = r.width() + Margin;
+    }
     for (int i=0; i<d.teams.size(); ++i) {
         if (d.teams.at(i)->isVisible()) {
             d.teams.at(i)->setGeometry(r);
-            r.translate(r.width() + Margin, 0);
+            r.translate(add);
         }
     }
 }
+
 static inline bool compareTeamsByScore(const Team *left, const Team *right)
 {
     return left->points() < right->points();

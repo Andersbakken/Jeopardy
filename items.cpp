@@ -187,7 +187,7 @@ void Frame::draw(QPainter *painter, const QRect &rect)
 void TeamProxy::setGeometry(const QRectF &geometry)
 {
     d.geometry = geometry;
-    d.scene->setTeamGeometry(geometry);
+    d.scene->setTeamGeometry(geometry, d.orientation);
 }
 
 void StatusBar::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
