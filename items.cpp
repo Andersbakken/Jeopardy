@@ -114,6 +114,16 @@ void Item::hoverLeaveEvent(QGraphicsSceneHoverEvent *)
     update();
 }
 
+void Item::setAcceptHoverEvents(bool enabled) // override
+{
+    if (!enabled && d.hovered) {
+        d.hovered = false;
+        update();
+    }
+    QGraphicsWidget::setAcceptHoverEvents(enabled);
+}
+
+
 void Item::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
 {
 //    const QTransform &worldTransform = painter->worldTransform();

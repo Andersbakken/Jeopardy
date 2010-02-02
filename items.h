@@ -30,6 +30,7 @@ public:
     virtual void hoverEnterEvent(QGraphicsSceneHoverEvent *event);
     virtual void hoverLeaveEvent(QGraphicsSceneHoverEvent *event);
     virtual QVariant itemChange(GraphicsItemChange change, const QVariant &value);
+    void setAcceptHoverEvents(bool enabled); // override
 signals:
     void clicked(Item *item, const QPointF &scenePos);
 private:
@@ -39,7 +40,7 @@ private:
         bool hovered;
         QColor backgroundColor, color;
     } d;
-    friend class GraphicsScene;
+//    friend class GraphicsScene;
 };
 
 class StatusBar : public Item

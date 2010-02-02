@@ -120,9 +120,6 @@ GraphicsScene::GraphicsScene(QObject *parent)
     proxyGroup->addAnimation(new QPropertyAnimation(&d.proxy, "geometry"));
     proxyGroup->addAnimation(new QPropertyAnimation(&d.proxy, "backgroundColor"));
     proxyGroup->addAnimation(new QPropertyAnimation(&d.proxy, "color"));
-    TextAnimation *textAnimation = new TextAnimation(&d.proxy, "text");
-    textAnimation->setDuration(1000);
-    proxyGroup->addAnimation(textAnimation);
 
     QParallelAnimationGroup *teamProxyGroup = new QParallelAnimationGroup(this);
     teamProxyGroup->addAnimation(new QPropertyAnimation(d.teamProxy, "geometry"));
@@ -139,19 +136,9 @@ GraphicsScene::GraphicsScene(QObject *parent)
     addTransition(TimeOut, Normal);
     addTransition(TimeOut, Finished);
     addTransition(PickTeam, NoAnswers);
-
     addTransition(NoAnswers, Normal);
     addTransition(NoAnswers, Finished);
-
     addTransition(PickTeam, PickRightOrWrong);
-    {
-        QSequentialAnimationGroup *sequential = new QSequentialAnimationGroup(this);
-        sequential->addAnimation(teamProxyGroup);
-        sequential->addPause(200);
-        sequential->addAnimation(rightWrongOpacityGroup);
-//        pickTeamToPickRightOrWrong->addAnimation(sequential);
-    }
-
     addTransition(TeamTimedOut, ShowQuestion);
     addTransition(PickRightOrWrong, RightAnswer);
     addTransition(PickRightOrWrong, WrongAnswer);
@@ -160,29 +147,21 @@ GraphicsScene::GraphicsScene(QObject *parent)
     addTransition(WrongAnswer, ShowQuestion);
     addTransition(WrongAnswer, Normal);
     addTransition(WrongAnswer, Finished);
-    addTransition(PickTeam, WrongAnswer);
 
     d.states[Normal]->assignProperty(&d.proxy, "yRotation", 0.0);
-//    d.states[Normal]->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.states[Normal]->assignProperty(&d.proxy, "progressBarColor", Qt::yellow);
 
     d.states[ShowQuestion]->assignProperty(&d.proxy, "yRotation", 360.0);
-//     d.states[ShowQuestion]->assignProperty(&d.proxy, "answerProgress", 1.0);
-//     d.states[ShowQuestion]->assignProperty(&d.proxy, "progressBarColor", Qt::green);
     d.states[ShowQuestion]->assignProperty(&d.proxy, "backgroundColor", Qt::yellow);
     d.states[ShowQuestion]->assignProperty(&d.proxy, "color", Qt::black);
 
     d.states[PickTeam]->assignProperty(d.teamProxy, "orientation", Qt::Vertical);
-//    d.states[PickTeam]->assignProperty(&d.proxy, "answerProgress", 0.0);
 
     d.states[PickRightOrWrong]->assignProperty(d.teamProxy, "orientation", Qt::Horizontal);
     d.states[PickRightOrWrong]->assignProperty(d.rightAnswerItem, "opacity", 1.0);
     d.states[PickRightOrWrong]->assignProperty(d.wrongAnswerItem, "opacity", 1.0);
     d.states[PickRightOrWrong]->assignProperty(d.teamProxy, "color", Qt::black);
 
-//     d.states[WrongAnswer]->assignProperty(&d.proxy, "backgroundColor", Qt::red);
-//     d.states[WrongAnswer]->assignProperty(&d.proxy, "color", Qt::black);
-//    d.states[WrongAnswer]->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.states[WrongAnswer]->assignProperty(&d.proxy, "yRotation", 0.0);
     d.states[WrongAnswer]->assignProperty(d.rightAnswerItem, "opacity", 0.0);
     d.states[WrongAnswer]->assignProperty(d.wrongAnswerItem, "opacity", 0.0);
@@ -191,9 +170,6 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.states[WrongAnswer]->assignProperty(&d.proxy, "color", Qt::red);
     d.states[WrongAnswer]->assignProperty(&d.proxy, "backgroundColor", Qt::black);
 
-//     d.states[RightAnswer]->assignProperty(&d.proxy, "backgroundColor", Qt::green);
-//     d.states[RightAnswer]->assignProperty(&d.proxy, "color", Qt::black);
-//    d.states[RightAnswer]->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.states[RightAnswer]->assignProperty(&d.proxy, "color", Qt::green);
     d.states[RightAnswer]->assignProperty(d.teamProxy, "backgroundColor", Qt::darkGray);
     d.states[RightAnswer]->assignProperty(d.teamProxy, "color", Qt::white);
@@ -211,8 +187,39 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.states[TeamTimedOut]->assignProperty(&d.proxy, "color", Qt::red);
     d.states[TeamTimedOut]->assignProperty(&d.proxy, "backgroundColor", Qt::black);
 
-//    d.states[RightAnswer]->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.states[RightAnswer]->assignProperty(&d.proxy, "yRotation", 0.0);
+
+    {
+        QSequentialAnimationGroup *sequential = new QSequentialAnimationGroup(&d.stateMachine);
+        QParallelAnimationGroup *parallel = new QParallelAnimationGroup;
+        QPropertyAnimation *animation;
+        enum { Duration = 750 };
+        parallel->addAnimation(animation = new QPropertyAnimation(&d.proxy, "geometry"));
+        animation->setDuration(Duration);
+        parallel->addAnimation(animation = new QPropertyAnimation(&d.proxy, "yRotation"));
+        animation->setDuration(Duration);
+        sequential->addAnimation(parallel);
+        sequential->addAnimation(animation = new TextAnimation(&d.proxy, "text"));
+        animation->setDuration(Duration);
+
+        transition(Normal, ShowQuestion)->addAnimation(sequential);
+        transition(NoAnswers, Normal)->addAnimation(sequential);
+        transition(RightAnswer, Normal)->addAnimation(sequential);
+        transition(WrongAnswer, Normal)->addAnimation(sequential);
+        transition(TimeOut, Normal)->addAnimation(sequential);
+    }
+
+    {
+        QParallelAnimationGroup *teamAnimation = new QParallelAnimationGroup(&d.stateMachine);
+        QPropertyAnimation *animation;
+        enum { Duration = 250 };
+        teamAnimation->addAnimation(animation = new QPropertyAnimation(d.teamProxy, "geometry"));
+        animation->setDuration(Duration);
+        transition(ShowQuestion, PickTeam)->addAnimation(teamAnimation);
+        transition(PickTeam, NoAnswers)->addAnimation(teamAnimation);
+        transition(PickTeam, PickRightOrWrong)->addAnimation(teamAnimation);
+    }
+
 
     d.stateMachine.setInitialState(d.states[Normal]);
     d.stateMachine.start();
@@ -397,10 +404,8 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rr)
 //     };
 
     for (int i=0; i<NumStates; ++i) {
-        if (i != PickTeam && d.states[i])
-            d.states[i]->assignProperty(d.teamProxy, "geometry", d.teamsGeometry);
+        d.states[i]->assignProperty(d.teamProxy, "geometry", i == PickTeam ? raised : d.teamsGeometry);
     }
-    d.states[PickTeam]->assignProperty(d.teamProxy, "geometry", raised);
     d.wrongAnswerItem->setGeometry(QRectF(raised.x(), raised.y(), raised.width() / 2, raised.height()));
     d.rightAnswerItem->setGeometry(QRectF(raised.x() + (raised.width() / 2), raised.y(), raised.width() / 2, raised.height()));
     d.statusBar->setGeometry(rr.left(), rr.bottom() - StatusBarHeight, rr.width(), StatusBarHeight);
@@ -476,8 +481,6 @@ void GraphicsScene::onClicked(Item *item)
                 if (team == d.cancelTeam) {
                     emit next(NoAnswers);
                 } else if (team->acceptsHoverEvents()) {
-                    item->d.hovered = false; // hack
-                    team->update();
                     d.teamProxy->setActiveTeam(team);
                     emit next(PickRightOrWrong);
                 }
@@ -674,7 +677,6 @@ void GraphicsScene::onStateExited()
 void GraphicsScene::finishQuestion()
 {
     d.currentFrame->setAcceptHoverEvents(false);
-    static_cast<Item*>(d.currentFrame)->d.hovered = false; // ### hack
     d.currentFrame = 0;
     d.teamsAttempted.clear();
     if (d.framesLeft == 0) {
