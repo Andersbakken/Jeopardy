@@ -13,6 +13,7 @@ public:
     void mouseDoubleClickEvent(QMouseEvent *e);
 public slots:
     void newGame();
+    void createGame();
 private:
     struct Data {
         GraphicsScene *scene;

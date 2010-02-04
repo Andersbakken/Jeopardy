@@ -19,6 +19,11 @@ GraphicsView::GraphicsView(QGraphicsScene *scene, QWidget *parent)
     action->setShortcut(QKeySequence::New);
     connect(action, SIGNAL(triggered(bool)), this, SLOT(newGame()));
     addAction(action);
+
+    action = new QAction(tr("&Create game"), this);
+    connect(action, SIGNAL(triggered(bool)), this, SLOT(createGame()));
+
+    addAction(action);
 }
 
 void GraphicsView::resizeEvent(QResizeEvent *e)
@@ -48,6 +53,83 @@ void GraphicsView::newGame()
             d.scene->setSceneRect(rect());
         }
     }
+}
+
+class GameDialog : public QDialog
+{
+    Q_OBJECT
+public:
+    GameDialog(QWidget *parent)
+        : QDialog(parent)
+    {
+        QGridLayout *layout = new QGridLayout(this);
+        QLabel *lbl = new QLabel(tr("&Name"));
+        layout->addWidget(lbl, 0, 0);
+        d.name = new QLineEdit;
+        lbl->setBuddy(d.name);
+        connect(d.name, SIGNAL(textChanged(QString)), this, SLOT(updateOk()));
+        layout->addWidget(d.name, 0, 1, 1, 5);
+
+        for (int i=0; i<Rows; ++i) {
+            if (i == 0) {
+                layout->addWidget(new QLabel(tr("Categories")), 1, 0);
+            } else {
+                layout->addWidget(new QLabel(QString("$%1").arg(i * 100)), i + 1, 0);
+            }
+            for (int j=0; j<Columns; ++j) {
+                QLineEdit *edit = new QLineEdit;
+                d.edits[i][j] = edit;
+                connect(edit, SIGNAL(textChanged(QString)), this, SLOT(updateOk()));
+                layout->addWidget(edit, i + 1, j + 1);
+            }
+        }
+        d.buttonBox = new QDialogButtonBox(QDialogButtonBox::Save|QDialogButtonBox::Cancel, Qt::Horizontal, this);
+        connect(d.buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
+        connect(d.buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
+        layout->addWidget(d.buttonBox, layout->rowCount(), 0, 1, layout->columnCount());
+        d.buttonBox->button(QDialogButtonBox::Save)->setEnabled(false);
+
+    }
+public slots:
+    void updateOk()
+    {
+        if (d.name->text().isEmpty()) {
+            d.buttonBox->button(QDialogButtonBox::Save)->setEnabled(false);
+            return;
+        }
+        bool hasCategory = false;
+        for (int i=0; i<Columns; ++i) {
+            bool found = false;
+            for (int j=0; j<Rows; ++j) {
+                const bool empty = d.edits[j][i]->text().isEmpty();
+                if (found && empty) {
+                    d.buttonBox->button(QDialogButtonBox::Save)->setEnabled(false);
+                    return;
+                } else if (!empty && !found && j > 0) {
+                    d.buttonBox->button(QDialogButtonBox::Save)->setEnabled(false);
+                    return;
+                } else if (!empty) {
+                    found = true;
+                }
+            }
+        }
+        d.buttonBox->button(QDialogButtonBox::Save)->setEnabled(hasCategory);
+    }
+private:
+    enum { Rows = 6, Columns = 6 };
+    struct Data {
+        QLineEdit *name;
+        QDialogButtonBox *buttonBox;
+        QLineEdit *edits[Rows][Columns];
+    } d;
+};
+
+#include "view.moc"
+
+void GraphicsView::createGame()
+{
+    GameDialog dlg(this);
+    dlg.exec();
 }
 
 void GraphicsView::mouseDoubleClickEvent(QMouseEvent *e)
