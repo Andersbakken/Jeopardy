@@ -73,6 +73,7 @@ signals:
     void next(int type);
     void mouseButtonPressed(const QPointF &, Qt::MouseButton);
 public slots:
+    void finishQuestion();
     bool load(const QString &file, const QStringList &teams = QStringList())
     { QFile f(file); return f.open(QIODevice::ReadOnly) && load(&f, teams); }
     void onClicked(Item *item);
@@ -83,7 +84,6 @@ public slots:
     void onStateExited();
     void nextStateTimeOut() { emit next(TimeOut); }
 private:
-    void finishQuestion();
     Transition *transition(StateType from, StateType to) const;
     Transition *addTransition(StateType from, StateType to);
 
@@ -111,7 +111,6 @@ private:
         QTimer timeoutTimer;
         QTime timeoutTimerStarted;
         int elapsed;
-        StatusBar *statusBar;
     } d;
 };
 

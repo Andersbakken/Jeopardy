@@ -1,4 +1,4 @@
-#include "graphicsscene.h"
+#include "scene.h"
 
 static inline QRectF itemGeometry(int row, int column, int rows, int columns, const QRectF &sceneRect)
 {
@@ -69,10 +69,6 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.elapsed = 0;
     d.currentState = 0;
     d.cancelTeam = 0;
-    d.statusBar = new StatusBar;
-    addItem(d.statusBar);
-    d.statusBar->setMaximum(100);
-    d.statusBar->setValue(45);
     connect(&d.timeoutTimer, SIGNAL(timeout()), this, SLOT(nextStateTimeOut()));
 
     d.wrongAnswerItem = new Item;
@@ -149,7 +145,6 @@ GraphicsScene::GraphicsScene(QObject *parent)
     addTransition(WrongAnswer, Finished);
 
     d.states[Normal]->assignProperty(&d.proxy, "yRotation", 0.0);
-    d.states[Normal]->assignProperty(&d.proxy, "progressBarColor", Qt::yellow);
 
     d.states[ShowQuestion]->assignProperty(&d.proxy, "yRotation", 360.0);
     d.states[ShowQuestion]->assignProperty(&d.proxy, "backgroundColor", Qt::yellow);
@@ -202,11 +197,22 @@ GraphicsScene::GraphicsScene(QObject *parent)
         sequential->addAnimation(animation = new TextAnimation(&d.proxy, "text"));
         animation->setDuration(Duration);
 
+
+        QSequentialAnimationGroup *sequentialReverse = new QSequentialAnimationGroup(&d.stateMachine);
+        parallel = new QParallelAnimationGroup;
+        parallel->addAnimation(animation = new QPropertyAnimation(&d.proxy, "geometry"));
+        animation->setDuration(Duration);
+        parallel->addAnimation(animation = new QPropertyAnimation(&d.proxy, "yRotation"));
+        animation->setDuration(Duration);
+        sequentialReverse->addAnimation(animation = new TextAnimation(&d.proxy, "text"));
+        sequentialReverse->addAnimation(parallel);
+        animation->setDuration(Duration);
+
         transition(Normal, ShowQuestion)->addAnimation(sequential);
-        transition(NoAnswers, Normal)->addAnimation(sequential);
-        transition(RightAnswer, Normal)->addAnimation(sequential);
-        transition(WrongAnswer, Normal)->addAnimation(sequential);
-        transition(TimeOut, Normal)->addAnimation(sequential);
+        transition(NoAnswers, Normal)->addAnimation(sequentialReverse);
+        transition(RightAnswer, Normal)->addAnimation(sequentialReverse);
+        transition(WrongAnswer, Normal)->addAnimation(sequentialReverse);
+        transition(TimeOut, Normal)->addAnimation(sequentialReverse);
     }
 
     {
@@ -370,9 +376,9 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rr)
     if (d.sceneRectChangedBlocked || rr.isEmpty())
         return;
 
-    enum { TeamsHeight = 100, StatusBarHeight = 20 };
+    enum { TeamsHeight = 100 };
     d.teamsGeometry = QRectF(rr.topLeft(), QSize(rr.width(), TeamsHeight));
-    d.framesGeometry = rr.adjusted(0, TeamsHeight, 0, -StatusBarHeight );
+    d.framesGeometry = rr.adjusted(0, TeamsHeight, 0, 0 );
 
     d.states[ShowQuestion]->assignProperty(&d.proxy, "geometry", ::raisedGeometry(d.framesGeometry));
 
@@ -408,7 +414,6 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rr)
     }
     d.wrongAnswerItem->setGeometry(QRectF(raised.x(), raised.y(), raised.width() / 2, raised.height()));
     d.rightAnswerItem->setGeometry(QRectF(raised.x() + (raised.width() / 2), raised.y(), raised.width() / 2, raised.height()));
-    d.statusBar->setGeometry(rr.left(), rr.bottom() - StatusBarHeight, rr.width(), StatusBarHeight);
 
     d.sceneRectChangedBlocked = false;
 }
@@ -420,7 +425,6 @@ void GraphicsScene::reset()
     Q_ASSERT(d.wrongAnswerItem);
     removeItem(d.rightAnswerItem);
     removeItem(d.wrongAnswerItem);
-    removeItem(d.statusBar);
     d.sceneRectChangedBlocked = false;
     clear();
     d.frames.clear();
@@ -428,7 +432,6 @@ void GraphicsScene::reset()
     d.teams.clear();
     addItem(d.rightAnswerItem);
     addItem(d.wrongAnswerItem);
-    addItem(d.statusBar);
 }
 
 void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *e)
@@ -454,6 +457,12 @@ void GraphicsScene::onClicked(Item *item)
             if (Frame *frame = qgraphicsitem_cast<Frame*>(item)) {
                 if (frame->status() != Frame::Hidden)
                     break;
+                foreach(Frame *f, d.frames) {
+                    if (f != frame && f->status() == Frame::Hidden) {
+                        f->setAcceptHoverEvents(false);
+                    }
+                }
+
                 d.currentFrame = frame;
                 d.proxy.setActiveFrame(frame);
                 const QRectF r = frameGeometry(frame);
@@ -461,9 +470,7 @@ void GraphicsScene::onClicked(Item *item)
                 d.states[Normal]->assignProperty(&d.proxy, "text", frame->valueString());
                 d.states[ShowQuestion]->assignProperty(&d.proxy, "text", frame->question());
                 d.states[RightAnswer]->assignProperty(&d.proxy, "text", QString("%1 is the answer :-)").arg(frame->answer()));
-                d.states[RightAnswer]->assignProperty(&d.proxy, "geometry", r);
                 d.states[WrongAnswer]->assignProperty(&d.proxy, "text", QString("%1 is the answer :-(").arg(frame->answer()));
-                d.states[WrongAnswer]->assignProperty(&d.proxy, "geometry", r);
                 emit next(ShowQuestion);
             }
             break;
@@ -498,6 +505,9 @@ void GraphicsScene::onClicked(Item *item)
         case WrongAnswer:
             break;
         case RightAnswer:
+            if (item == d.currentFrame) {
+                finishQuestion();
+            }
             break;
         case Finished:
             break;
@@ -562,7 +572,7 @@ static inline bool compareTeamsByScore(const Team *left, const Team *right)
 void GraphicsScene::onStateEntered()
 {
     d.currentState = qobject_cast<State*>(sender());
-    qDebug() << d.currentState->objectName() << "entered";
+    qDebug() << d.currentState->objectName() << "entered" << QTime::currentTime().toString("mm:ss");
     const StateType type = d.currentState->type();
     switch (type) {
     case Normal:
@@ -571,6 +581,12 @@ void GraphicsScene::onStateEntered()
         Q_ASSERT(!d.teamProxy->activeTeam());
         Q_ASSERT(!d.currentFrame);
         d.elapsed = 0;
+        foreach(Frame *f, d.frames) {
+            if (f->status() == Frame::Hidden) {
+                f->setAcceptHoverEvents(true);
+            }
+        }
+
         break;
     case ShowQuestion: {
 //        d.timeoutTimer.start(5000 - d.elapsed);
@@ -626,7 +642,6 @@ void GraphicsScene::onStateEntered()
 //             qDebug() << d.teamProxy->activeTeam()->name << "answered correctly and earned" << d.currentFrame->value
 //                      << "$. They now have" << d.teamProxy->activeTeam()->score << "$";
         d.currentFrame->setStatus(Frame::Succeeded);
-        finishQuestion();
         break;
     case Finished:
         qSort(d.teams.end(), d.teams.begin(), compareTeamsByScore);

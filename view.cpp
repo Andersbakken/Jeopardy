@@ -1,5 +1,5 @@
-#include "graphicsview.h"
-#include "graphicsscene.h"
+#include "view.h"
+#include "scene.h"
 
 GraphicsView::GraphicsView(QGraphicsScene *scene, QWidget *parent)
     : QGraphicsView(scene, parent)

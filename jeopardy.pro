@@ -8,8 +8,8 @@ DEPENDPATH += .
 INCLUDEPATH += .
 
 # Input
-HEADERS += graphicsscene.h graphicsview.h items.h
-SOURCES += graphicsscene.cpp graphicsview.cpp main.cpp items.cpp
+HEADERS += scene.h view.h items.h
+SOURCES += scene.cpp view.cpp main.cpp items.cpp
 CONFIG += debug
 unix {
     MOC_DIR=.moc

@@ -1,7 +1,6 @@
-#include "graphicsscene.h"
+#include "scene.h"
 #include "items.h"
 
-bool Frame::Data::framesAcceptHoverEvents = true;
 static inline void initTextLayout(QTextLayout *layout, const QRectF &rect, int pixelSize)
 {
     layout->setCacheEnabled(true);
@@ -102,8 +101,6 @@ qreal Item::yRotation() const
 
 void Item::hoverEnterEvent(QGraphicsSceneHoverEvent *)
 {
-    if (!Frame::framesAcceptHoverEvents() && qgraphicsitem_cast<Frame*>(this))
-        return;
     d.hovered = true;
     update();
 }
@@ -135,7 +132,6 @@ void Item::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWid
     QBrush brush = d.hovered ? d.color : d.backgroundColor;
     enum { Margin = 5 };
     qDrawShadePanel(painter, option->rect, palette(), false, Margin, &brush);
-    draw(painter, option->rect);
     Q_ASSERT(d.color.isValid());
     painter->setPen(d.color);
     const QRectF r = option->rect.adjusted(Margin, Margin, -Margin, -Margin);
@@ -177,37 +173,12 @@ Frame::Frame(int row, int column)
     d.row = row;
     d.column = column;
     d.value = 0;
-    d.answerProgress = 0;;
-}
-
-void Frame::draw(QPainter *painter, const QRect &rect)
-{
-    if (!qFuzzyIsNull(d.answerProgress) && !qFuzzyCompare(d.answerProgress, 1.0)) {
-        enum { Margin = 5, PenWidth = 3 };
-        painter->setPen(QPen(Qt::black, PenWidth));
-        const qreal adjust = Margin + (PenWidth / 2);
-        QRectF r = rect.adjusted(adjust, 0, -adjust, -adjust);
-        r.setWidth(r.width() * d.answerProgress);
-        r.setTop(rect.bottom() - qBound(10, rect.height() / 4, 30));
-        painter->setBrush(d.progressBarColor);
-        painter->drawRect(r);
-    }
 }
 
 void TeamProxy::setGeometry(const QRectF &geometry)
 {
     d.geometry = geometry;
     d.scene->setTeamGeometry(geometry, d.orientation);
-}
-
-void StatusBar::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *)
-{
-    const QRectF r = rect();
-    if (d.maximum != 0) {
-        const qreal x = qreal(d.value) / qreal(d.maximum) * r.width();
-        painter->fillRect(0, 0, x, r.height(), backgroundColor());
-        painter->drawText(r, Qt::AlignCenter, text());
-    }
 }
 
 static inline int _q_interpolate(int f, int t, qreal progress)
@@ -224,16 +195,6 @@ static inline QColor _q_interpolate(const QColor &f, const QColor &t, qreal prog
                   _q_interpolate(f.alpha(), t.alpha(), progress));
 }
 
-void StatusBar::setValue(int value)
-{
-    if (d.maximum != 0) {
-        d.value = value;
-        const qreal progress = qreal(value) / qreal(d.maximum);
-        setBackgroundColor(_q_interpolate(Qt::green, Qt::red, progress));
-        qDebug() << progress << value << d.maximum << backgroundColor();
-        setText(QString("%1%%").arg(progress * 100));
-    }
-}
 QVariant Item::itemChange(GraphicsItemChange change, const QVariant &value)
 {
     if (change == ItemVisibleChange && !value.toBool()) {

@@ -26,7 +26,6 @@ public:
     QColor color() const;
     GraphicsScene *graphicsScene() const;
     virtual void mousePressEvent(QGraphicsSceneMouseEvent *event);
-    virtual void draw(QPainter *, const QRect &) {}
     virtual void hoverEnterEvent(QGraphicsSceneHoverEvent *event);
     virtual void hoverLeaveEvent(QGraphicsSceneHoverEvent *event);
     virtual QVariant itemChange(GraphicsItemChange change, const QVariant &value);
@@ -41,24 +40,6 @@ private:
         QColor backgroundColor, color;
     } d;
 //    friend class GraphicsScene;
-};
-
-class StatusBar : public Item
-{
-    Q_OBJECT
-    Q_PROPERTY(int maximum READ maximum WRITE setMaximum)
-    Q_PROPERTY(int value READ value WRITE setValue)
-public:
-    StatusBar() : Item() { d.maximum = d.value = 0; setColor(Qt::black); }
-    int maximum() const { return d.maximum; }
-    void setMaximum(int maximum) { d.maximum = maximum; update(); }
-    int value() const { return d.value; }
-    void setValue(int value);
-    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = 0);
-private:
-    struct Data {
-        int maximum, value;
-    } d;
 };
 
 class Frame : public Item
@@ -85,28 +66,17 @@ public:
     int value() const { return d.value; }
     QString valueString() const { return d.valueString; }
 
-    qreal answerProgress() const { return d.answerProgress; }
-    void setAnswerProgress(qreal answerProgress) { d.answerProgress = answerProgress; update(); }
-    QColor progressBarColor() const { return d.progressBarColor; }
-    void setProgressBarColor(const QColor &color) { d.progressBarColor = color; update(); }
-
     QString question() const { return d.question; }
     void setQuestion(const QString &question) { d.question = question; }
     QString answer() const { return d.answer; }
     void setAnswer(const QString &answer) { d.answer = answer; }
 
-    virtual void draw(QPainter *, const QRect &);
-    static void setFramesAcceptHoverEvents(bool on) { Data::framesAcceptHoverEvents = on; }
-    static bool framesAcceptHoverEvents() { return Data::framesAcceptHoverEvents; }
 private:
     struct Data {
         QString question, answer, valueString;
         int value;
-        qreal answerProgress;
         int row, column;
-        QColor progressBarColor;
         Status status;
-        static bool framesAcceptHoverEvents;
     } d;
 };
 
@@ -135,10 +105,8 @@ class Proxy : public QObject
     Q_PROPERTY(qreal yRotation READ yRotation WRITE setYRotation)
     Q_PROPERTY(QString text READ text WRITE setText)
     Q_PROPERTY(QRectF geometry READ geometry WRITE setGeometry)
-    Q_PROPERTY(qreal answerProgress READ answerProgress WRITE setAnswerProgress)
     Q_PROPERTY(QColor backgroundColor READ backgroundColor WRITE setBackgroundColor)
     Q_PROPERTY(QColor color READ color WRITE setColor)
-    Q_PROPERTY(QColor progressBarColor READ progressBarColor WRITE setProgressBarColor)
     Q_PROPERTY(bool activeFrame READ hasActiveFrame WRITE setActiveFrame)
 public:
     Proxy(QObject *parent = 0) : QObject(parent) { d.activeFrame = 0; }
@@ -149,17 +117,11 @@ public:
     QString text() const { return d.activeFrame ? d.activeFrame->text() : QString(); }
     void setText(const QString &tt) { if (d.activeFrame) d.activeFrame->setText(tt); }
 
-    QColor progressBarColor() const { return d.activeFrame ? d.activeFrame->progressBarColor() : QColor(); }
-    void setProgressBarColor(const QColor &tt) { if (d.activeFrame) d.activeFrame->setProgressBarColor(tt); }
-
     QColor backgroundColor() const { return d.activeFrame ? d.activeFrame->backgroundColor() : QColor(); }
     void setBackgroundColor(const QColor &tt) { if (d.activeFrame) d.activeFrame->setBackgroundColor(tt); }
 
     QColor color() const { return d.activeFrame ? d.activeFrame->color() : QColor(); }
     void setColor(const QColor &tt) { if (d.activeFrame) d.activeFrame->setColor(tt); }
-
-    qreal answerProgress() const { return d.activeFrame ? d.activeFrame->answerProgress() : qreal(0.0); }
-    void setAnswerProgress(qreal yy) { if (d.activeFrame) d.activeFrame->setAnswerProgress(yy); }
 
     QRectF geometry() const { return d.activeFrame ? d.activeFrame->geometry() : QRectF(); }
     void setGeometry(const QRectF &tt) { if (d.activeFrame) d.activeFrame->setGeometry(tt); }
