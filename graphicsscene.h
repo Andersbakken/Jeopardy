@@ -14,7 +14,6 @@ public:
     void keyPressEvent(QKeyEvent *e);
     void mousePressEvent(QGraphicsSceneMouseEvent *e);
     QRectF frameGeometry(Frame *frame) const;
-    void setupStateMachine(Frame *frame);
     int answerTime() const;
     void setTeamGeometry(const QRectF &rect);
 signals:
@@ -62,7 +61,6 @@ private:
         QState *currentState;
         QList<Team*> teams;
         QSet<Team*> teamsAttempted;
-        Team *currentTeam;
 
         QList<Frame*> frames;
         int framesLeft;

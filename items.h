@@ -6,6 +6,10 @@ class GraphicsScene;
 class Item : public QGraphicsWidget
 {
     Q_OBJECT
+    Q_PROPERTY(QColor backgroundColor READ backgroundColor WRITE setBackgroundColor)
+    Q_PROPERTY(QColor color READ color WRITE setColor)
+    Q_PROPERTY(QString text READ text WRITE setText)
+    Q_PROPERTY(qreal yRotation READ yRotation WRITE setYRotation)
 public:
     Item();
     enum { Type = QGraphicsItem::UserType + 1 };
@@ -197,8 +201,9 @@ public:
     QColor backgroundColor() const { return d.activeTeam ? d.activeTeam->backgroundColor() : QColor(); }
     void setBackgroundColor(const QColor &tt) { if (d.activeTeam) d.activeTeam->setBackgroundColor(tt); }
     QColor color() const { return d.activeTeam ? d.activeTeam->color() : QColor(); }
-    void setColor(const QColor &tt) { if (d.activeTeam) d.activeTeam->setColor(tt); }
+    void setColor(const QColor &tt) { Q_ASSERT(d.activeTeam); if (d.activeTeam) { d.activeTeam->setColor(tt); } else { qDebug() << "tried to set it to" << tt; } }
     void setActiveTeam(Team *team) { d.activeTeam = team; }
+    Team *activeTeam() const { return d.activeTeam; }
 private:
     struct Data {
         GraphicsScene *scene;
