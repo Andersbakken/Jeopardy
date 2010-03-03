@@ -255,10 +255,10 @@ static QStringList pickTeams(QWidget *parent)
     dlg.setWindowTitle(GraphicsScene::tr("Create teams"));
     QGridLayout *layout = new QGridLayout(&dlg);
     QList<QLineEdit*> edits;
+    const QStringList teamNames = QSettings().value("lastTeams", (QStringList() << GraphicsScene::tr("Team 1") << GraphicsScene::tr("Team 2"))).toStringList();
     for (int i=0; i<12; ++i) {
         QLineEdit *edit = new QLineEdit;
-        if (i < 2)
-            edit->setText(GraphicsScene::tr("Team %1").arg(i + 1));
+        edit->setText(teamNames.value(i));
         edits.append(edit);
         layout->addWidget(edit, i / 2, i % 2);
     }
@@ -276,6 +276,7 @@ static QStringList pickTeams(QWidget *parent)
                 ret.append(text);
         }
     }
+    QSettings().setValue("lastTeams", ret);
     return ret;
 }
 
