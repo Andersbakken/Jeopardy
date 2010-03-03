@@ -27,9 +27,6 @@ GraphicsView::GraphicsView(QGraphicsScene *scene, QWidget *parent)
     action->setShortcut(QKeySequence::Quit);
     connect(action, SIGNAL(triggered(bool)), this, SLOT(close()));
     addAction(action);
-
-
-    addAction(action);
 }
 
 void GraphicsView::resizeEvent(QResizeEvent *e)
@@ -47,17 +44,11 @@ void GraphicsView::newGame()
 {
     QSettings settings("AndersSoft", "Jeopardy");
     const QString directory = settings.value("lastDirectory", QCoreApplication::applicationDirPath()).toString();
-    const QString file = QFileDialog::getOpenFileName(this, "Choose game", directory);
+
+    const QString file = QFileDialog::getOpenFileName(this, "Choose game", directory, "*.jgm");
     if (QFile::exists(file)) {
         settings.setValue("lastDirectory", QFileInfo(file).absolutePath());
-        GraphicsScene *scene = new GraphicsScene(this);
-        if (scene->load(file)) {
-            setBackgroundBrush(QBrush());
-            delete d.scene;
-            d.scene = scene;
-            setScene(scene);
-            d.scene->setSceneRect(rect());
-        }
+        load(file);
     }
 }
 
@@ -130,6 +121,7 @@ public:
     GameDialog(QWidget *parent)
         : QDialog(parent)
     {
+        d.play = false;
         QGridLayout *layout = new QGridLayout(this);
         QLabel *lbl = new QLabel(tr("&Name"));
         layout->addWidget(lbl, 0, 0);
@@ -169,21 +161,38 @@ public:
                 }
             }
         }
+        QWidget *last = d.name;
+        for (int i=0; i<Columns; ++i) {
+            QWidget::setTabOrder(last, d.categories[i]);
+            last = d.categories[i];
+            for (int j=0; j<Rows; ++j) {
+                QWidget::setTabOrder(last, d.edits[i][j][Question]);
+                QWidget::setTabOrder(d.edits[i][j][Question], d.edits[i][j][Answer]);
+                last = d.edits[i][j][Answer];
+            }
+        }
+
         setStyleSheet("QLineEdit:disabled { background: darkGray; }"
+                      "QLineEdit { background: white; }"
                       "TextEdit#Question:disabled { background: darkGray; color: white; }"
                       "TextEdit#Answer { color: white; background: black; }"
                       "TextEdit#Answer:disabled { color: white; background: darkGray; }");
 
         d.buttonBox = new QDialogButtonBox(QDialogButtonBox::Save|QDialogButtonBox::Cancel, Qt::Horizontal, this);
+        QWidget::setTabOrder(last, d.buttonBox);
+        d.playButton = d.buttonBox->addButton(tr("Play"), QDialogButtonBox::ApplyRole);
+
         connect(d.buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
         connect(d.buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
         layout->addWidget(d.buttonBox, layout->rowCount(), 0, 1, layout->columnCount());
         d.buttonBox->button(QDialogButtonBox::Save)->setEnabled(false);
+        d.playButton->setEnabled(false);
+        connect(d.playButton, SIGNAL(clicked()), this, SLOT(onPlay()));
     }
 
     void accept()
     {
-        QString name = d.name->text() + ".txt";
+        QString name = d.name->text() + ".jgm";
         if (QFile::exists(name)) {
             name.insert(name.size() - 4, "_%1");
             int idx = 1;
@@ -194,7 +203,16 @@ public:
         QFile file(name);
         file.open(QIODevice::WriteOnly);
         save(&file);
+        if (d.play) {
+            d.file = name;
+        }
+        qDebug() << d.file;
         QDialog::accept();
+    }
+
+    QString file() const
+    {
+        return d.file;
     }
 
     void save(QIODevice *device)
@@ -233,6 +251,11 @@ public:
         return true;
     }
 public slots:
+    void onPlay()
+    {
+        d.play = true;
+        accept();
+    }
     void updateOk()
     {
         const bool hasName = !d.name->text().isEmpty();
@@ -258,6 +281,7 @@ public slots:
             }
         }
 
+        d.playButton->setEnabled(hasCategory && !invalid);
         d.buttonBox->button(QDialogButtonBox::Save)->setEnabled(hasCategory && !invalid);
     }
 private:
@@ -265,8 +289,11 @@ private:
     struct Data {
         QLineEdit *name;
         QDialogButtonBox *buttonBox;
+        QPushButton *playButton;
         QLineEdit *categories[Columns];
         TextEdit *edits[Columns][Rows][2];
+        QString file;
+        bool play;
     } d;
 };
 
@@ -275,18 +302,21 @@ private:
 void GraphicsView::createGame()
 {
     GameDialog dlg(this);
-    dlg.exec();
+    if (dlg.exec() && !dlg.file().isEmpty()) {
+        load(dlg.file());
+    }
 }
 
-void GraphicsView::mouseDoubleClickEvent(QMouseEvent *e)
+void GraphicsView::load(const QString &fileName)
 {
-    if (!d.scene) {
-        d.scene = new GraphicsScene(this);
-        d.scene->load(":/questions.txt", QStringList() << "Team 1" << "Team 2");
+    GraphicsScene *scene = new GraphicsScene(this);
+    if (scene->load(fileName)) {
         setBackgroundBrush(QBrush());
+        delete d.scene;
+        d.scene = scene;
+        setScene(scene);
         d.scene->setSceneRect(rect());
-        setScene(d.scene);
     } else {
-        QGraphicsView::mouseDoubleClickEvent(e);
+        delete scene;
     }
 }

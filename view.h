@@ -10,7 +10,7 @@ public:
     GraphicsView(QGraphicsScene *scene = 0, QWidget *parent = 0);
     void resizeEvent(QResizeEvent *);
     QSize sizeHint() const;
-    void mouseDoubleClickEvent(QMouseEvent *e);
+    void load(const QString &fileName);
 public slots:
     void newGame();
     void createGame();
