@@ -29,6 +29,8 @@ public:
             return from;
         } else if (qFuzzyCompare(progress, 1.0)) {
             return to;
+        } else if (from == to) {
+            return from;
         }
 
 #if 0
@@ -467,7 +469,6 @@ void GraphicsScene::onClicked(Item *item)
                 d.proxy.setActiveFrame(frame);
                 const QRectF r = frameGeometry(frame);
                 d.states[Normal]->assignProperty(&d.proxy, "geometry", r);
-                d.states[Normal]->assignProperty(&d.proxy, "text", frame->valueString());
                 d.states[ShowQuestion]->assignProperty(&d.proxy, "text", frame->question());
                 d.states[RightAnswer]->assignProperty(&d.proxy, "text", QString("%1 is the answer :-)").arg(frame->answer()));
                 d.states[WrongAnswer]->assignProperty(&d.proxy, "text", QString("%1 is the answer :-(").arg(frame->answer()));
@@ -620,6 +621,7 @@ void GraphicsScene::onStateEntered()
         Q_ASSERT(d.currentFrame);
         d.teamProxy->activeTeam()->addPoints(-d.currentFrame->value() / 2);
         d.currentFrame->setStatus(Frame::Failed);
+        d.states[Normal]->assignProperty(&d.proxy, "text", d.currentFrame->answer());
         if (d.teamsAttempted.size() + 2 == d.teams.size()) {
             finishQuestion();
         } else {
@@ -631,6 +633,7 @@ void GraphicsScene::onStateEntered()
         ++d.wrong;
         Q_ASSERT(d.currentFrame);
         Q_ASSERT(!d.teamProxy->activeTeam());
+        d.states[Normal]->assignProperty(&d.proxy, "text", d.currentFrame->question());
         d.currentFrame->setStatus(Frame::Failed);
         finishQuestion();
         break;
@@ -638,6 +641,7 @@ void GraphicsScene::onStateEntered()
         ++d.right;
         Q_ASSERT(d.teamProxy->activeTeam());
         Q_ASSERT(d.currentFrame);
+        d.states[Normal]->assignProperty(&d.proxy, "text", d.currentFrame->answer());
         d.teamProxy->activeTeam()->addPoints(d.currentFrame->value());
 //             qDebug() << d.teamProxy->activeTeam()->name << "answered correctly and earned" << d.currentFrame->value
 //                      << "$. They now have" << d.teamProxy->activeTeam()->score << "$";
