@@ -18,18 +18,24 @@ public:
     QString text() const;
     void setBackgroundColor(const QColor &color);
     QColor backgroundColor() const;
+    void setHoveredBackgroundColor(const QColor &color);
+    QColor hoveredBackgroundColor() const;
     void setTextColor(const QColor &color);
     QColor textColor() const;
     GraphicsScene *graphicsScene() const;
     virtual void mousePressEvent(QGraphicsSceneMouseEvent *event);
     virtual void draw(QPainter *, const QRect &) {}
+    virtual void hoverEnterEvent(QGraphicsSceneHoverEvent *event);
+    virtual void hoverLeaveEvent(QGraphicsSceneHoverEvent *event);
+
 signals:
     void clicked(Item *item, const QPointF &scenePos);
 private:
     struct Data {
         QString text;
         qreal yRotation;
-        QColor backgroundColor, textColor;
+        bool hovered;
+        QColor backgroundColor, textColor, hoveredBackgroundColor;
     } d;
 };
 
@@ -72,10 +78,20 @@ private:
 class Team : public Item
 {
     Q_OBJECT
+    Q_PROPERTY(int points READ points WRITE setPoints)
 public:
     enum { Type = QGraphicsItem::UserType + 3 };
     virtual int type() const { return Type; }
-    Team(const QString &name) : Item() { setText(name); }
+    Team(const QString &name) : Item() { d.points = 0; setObjectName(name); updatePoints(); }
+
+    int points() const { return d.points; }
+    void setPoints(int points) { d.points = points; updatePoints(); }
+    void addPoints(int points) { d.points += points; updatePoints(); }
+private:
+    void updatePoints() { setText(QString("%1 - %2$").arg(objectName()).arg(points())); }
+    struct Data {
+        int points;
+    } d;
 };
 
 class Proxy : public QObject
@@ -86,6 +102,7 @@ class Proxy : public QObject
     Q_PROPERTY(QRectF geometry READ geometry WRITE setGeometry)
     Q_PROPERTY(qreal answerProgress READ answerProgress WRITE setAnswerProgress)
     Q_PROPERTY(QColor backgroundColor READ backgroundColor WRITE setBackgroundColor)
+    Q_PROPERTY(QColor hoveredBackgroundColor READ hoveredBackgroundColor WRITE setHoveredBackgroundColor)
     Q_PROPERTY(QColor textColor READ textColor WRITE setTextColor)
     Q_PROPERTY(QColor progressBarColor READ progressBarColor WRITE setProgressBarColor)
     Q_PROPERTY(bool activeFrame READ hasActiveFrame WRITE setActiveFrame)
@@ -103,6 +120,9 @@ public:
 
     QColor backgroundColor() const { return d.activeFrame ? d.activeFrame->backgroundColor() : QColor(); }
     void setBackgroundColor(const QColor &tt) { if (d.activeFrame) d.activeFrame->setBackgroundColor(tt); }
+
+    QColor hoveredBackgroundColor() const { return d.activeFrame ? d.activeFrame->hoveredBackgroundColor() : QColor(); }
+    void setHoveredBackgroundColor(const QColor &tt) { if (d.activeFrame) d.activeFrame->setHoveredBackgroundColor(tt); }
 
     QColor textColor() const { return d.activeFrame ? d.activeFrame->textColor() : QColor(); }
     void setTextColor(const QColor &tt) { if (d.activeFrame) d.activeFrame->setTextColor(tt); }
@@ -164,6 +184,7 @@ public:
     bool load(const QString &file) { QFile f(file); return f.open(QIODevice::ReadOnly) && load(&f); }
     void reset();
     void keyPressEvent(QKeyEvent *e);
+    void mousePressEvent(QGraphicsSceneMouseEvent *e);
     QRectF frameGeometry(Frame *frame) const;
     void click(Frame *frame);
     void setupStateMachine(Frame *frame);
@@ -176,10 +197,12 @@ signals:
     void showQuestion();
     void showAnswer();
     void teamPicked();
+    void mouseButtonPressed(const QPointF &, Qt::MouseButton);
 public slots:
     void onClicked(Item *item);
     void clearActiveFrame();
     void onSceneRectChanged(const QRectF &rect);
+    void onTransitionTriggered();
 private:
     struct Data {
         QStateMachine stateMachine;

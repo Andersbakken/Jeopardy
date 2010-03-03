@@ -5,8 +5,8 @@ static inline QRectF itemGeometry(int row, int column, int rows, int columns, co
     if (qMin(rows, columns) <= 0)
         return QRectF();
     QRectF r(0, 0, sceneRect.width() / columns, sceneRect.height() / rows);
-    r.moveLeft(r.width() * column);
-    r.moveTop(r.height() * row);
+    r.moveLeft((r.width() * column) + sceneRect.left() );
+    r.moveTop((r.height() * row) + sceneRect.top());
     return r;
 }
 
@@ -93,6 +93,7 @@ private:
 
 Item::Item()
 {
+    setAcceptHoverEvents(true);
     setCacheMode(ItemCoordinateCache);
     d.yRotation = 0;
 }
@@ -112,6 +113,17 @@ QColor Item::backgroundColor() const
 void Item::setBackgroundColor(const QColor &color)
 {
     d.backgroundColor = color;
+    update();
+}
+
+QColor Item::hoveredBackgroundColor() const
+{
+    return d.hoveredBackgroundColor;
+}
+
+void Item::setHoveredBackgroundColor(const QColor &color)
+{
+    d.hoveredBackgroundColor = color;
     update();
 }
 
@@ -158,8 +170,25 @@ qreal Item::yRotation() const
     return d.yRotation;
 }
 
+void Item::hoverEnterEvent(QGraphicsSceneHoverEvent *event)
+{
+    d.hovered = true;
+    if (d.backgroundColor != d.hoveredBackgroundColor)
+        update();
+}
+
+void Item::hoverLeaveEvent(QGraphicsSceneHoverEvent *event)
+{
+    d.hovered = false;
+    if (d.backgroundColor != d.hoveredBackgroundColor)
+        update();
+}
+
+
+
 void Item::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
 {
+    qDebug() << uint(option->state);
 //    const QTransform &worldTransform = painter->worldTransform();
 //     bool mirrored = false;
 //     if (worldTransform.m11() < 0 || worldTransform.m22() < 0) {
@@ -203,6 +232,8 @@ void SelectorItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opti
     painter->drawRoundedRect(option->rect.adjusted(PenWidth / 2, PenWidth / 2, -PenWidth / 2, -PenWidth / 2), PenWidth, PenWidth);
 }
 
+#define FOO(transition) transition->setObjectName(#transition); connect(transition, SIGNAL(triggered()), this, SLOT(onTransitionTriggered()));
+
 GraphicsScene::GraphicsScene(QObject *parent)
     : QGraphicsScene(parent)
 {
@@ -225,16 +256,16 @@ GraphicsScene::GraphicsScene(QObject *parent)
     d.showAnswerState = new QState(&d.stateMachine);
     d.showAnswerState->assignProperty(&d.proxy, "backgroundColor", Qt::blue);
     d.showAnswerState->assignProperty(&d.proxy, "progressBarColor", Qt::red);
-    d.showAnswerState->assignProperty(&d.teamProxy, "opacity", 0.0);
+//    d.showAnswerState->assignProperty(&d.teamProxy, "opacity", 0.0);
     d.showAnswerState->setObjectName("showAnswerState");
 
     d.pickTeamState = new QState(&d.stateMachine);
-    d.pickTeamState->assignProperty(&d.teamProxy, "opacity", 1.0);
+//    d.pickTeamState->assignProperty(&d.teamProxy, "opacity", 1.0);
     d.pickTeamState->assignProperty(&d.proxy, "answerProgress", 0.0);
     d.pickTeamState->setObjectName("pickTeamState");
 
     d.answerState = new QState(&d.stateMachine);
-    d.answerState->assignProperty(&d.teamProxy, "opacity", 0.0);
+//    d.answerState->assignProperty(&d.teamProxy, "opacity", 0.0);
     d.answerState->assignProperty(&d.proxy, "backgroundColor", Qt::yellow);
     d.answerState->assignProperty(&d.proxy, "textColor", Qt::blue);
     d.answerState->assignProperty(&d.proxy, "progressBarColor", Qt::red);
@@ -283,12 +314,14 @@ GraphicsScene::GraphicsScene(QObject *parent)
         sequential->addAnimation(answerProgressGroup);
 
         QAbstractTransition *showQuestionTransition = d.normalState->addTransition(this, SIGNAL(showQuestion()), d.showQuestionState);
+        FOO(showQuestionTransition);
         showQuestionTransition->addAnimation(sequential);
         connect(sequential, SIGNAL(finished()), this, SIGNAL(showAnswer()));
     }
 
     {
         QAbstractTransition *showAnswerTransition = d.showQuestionState->addTransition(this, SIGNAL(showAnswer()), d.showAnswerState);
+        FOO(showAnswerTransition);
         TextAnimation *textAnimation = new TextAnimation(&d.proxy, "text");
         textAnimation->setDuration(Duration);
         showAnswerTransition->addAnimation(textAnimation);
@@ -327,6 +360,7 @@ GraphicsScene::GraphicsScene(QObject *parent)
         wrongAnswerTransition->addAnimation(sequential);
 
         QAbstractTransition *correctAnswerTransition = d.answerState->addTransition(this, SIGNAL(correctAnswer()), d.correctAnswerState);
+        FOO(correctAnswerTransition);
         correctAnswerTransition->addAnimation(sequential);
 
         connect(sequential, SIGNAL(finished()), this, SLOT(clearActiveFrame()));
@@ -335,7 +369,8 @@ GraphicsScene::GraphicsScene(QObject *parent)
     {
         QPropertyAnimation *opacityAnimation = new QPropertyAnimation(&d.teamProxy, "opacity");
         opacityAnimation->setDuration(Duration / 2);
-        QAbstractTransition *pickTeamTransition = d.showQuestionState->addTransition(this, SIGNAL(spaceBarPressed()), d.pickTeamState);
+        QAbstractTransition *pickTeamTransition = d.showQuestionState->addTransition(this, SIGNAL(mouseButtonPressed(QPointF,Qt::MouseButton)), d.pickTeamState);
+        FOO(pickTeamTransition);
         pickTeamTransition->addAnimation(opacityAnimation);
     }
 
@@ -361,11 +396,42 @@ GraphicsScene::GraphicsScene(QObject *parent)
         connect(answerProgressAnimation, SIGNAL(finished()), this, SIGNAL(wrongAnswer()));
 
         QAbstractTransition *answerTransition = d.pickTeamState->addTransition(this, SIGNAL(teamPicked()), d.answerState);
+        FOO(answerTransition);
         answerTransition->addAnimation(sequential);
     }
 
     d.stateMachine.setInitialState(d.normalState);
     d.stateMachine.start();
+}
+
+static QStringList pickTeams(QWidget *parent)
+{
+    QDialog dlg(parent);
+    dlg.setWindowTitle(GraphicsScene::tr("Create teams"));
+    QGridLayout *layout = new QGridLayout(&dlg);
+    QList<QLineEdit*> edits;
+    for (int i=0; i<12; ++i) {
+        QLineEdit *edit = new QLineEdit;
+        if (i < 2)
+            edit->setText(GraphicsScene::tr("Team %1").arg(i + 1));
+        edits.append(edit);
+        layout->addWidget(edit, i / 2, i % 2);
+    }
+    QDialogButtonBox *box = new QDialogButtonBox(QDialogButtonBox::Ok|QDialogButtonBox::Cancel,
+                                                 Qt::Horizontal, &dlg);
+    layout->addWidget(box, layout->rowCount(), 0, 1, 2);
+    QObject::connect(box, SIGNAL(accepted()), &dlg, SLOT(accept()));
+    QObject::connect(box, SIGNAL(rejected()), &dlg, SLOT(reject()));
+    QStringList ret;
+    edits.first()->selectAll();
+    if (dlg.exec()) {
+        foreach(QLineEdit *edit, edits) {
+            const QString text = edit->text().simplified();
+            if (!text.isEmpty())
+                ret.append(text);
+        }
+    }
+    return ret;
 }
 
 bool GraphicsScene::load(QIODevice *device)
@@ -386,7 +452,8 @@ bool GraphicsScene::load(QIODevice *device)
     Frame *frame = 0;
     while (!ts.atEnd()) {
         ++lineNumber;
-        const QString line = ts.readLine();
+        QString line = ts.readLine();
+        line = line.simplified();
         if (line.indexOf(commentRegexp) == 0)
             continue;
         switch (state) {
@@ -436,11 +503,12 @@ bool GraphicsScene::load(QIODevice *device)
             break;
         }
     }
-    const char *teams[] = { "Team 1", "Team 2" , "Team 3", 0 };
-    for (int i=0; teams[i]; ++i) {
-        Team *team = new Team(teams[i]);
+
+    QStringList teams = pickTeams(views().value(0));
+    for (int i=0; i<teams.size(); ++i) {
+        Team *team = new Team(teams.at(i));
         connect(team, SIGNAL(clicked(Item*, QPointF)), this, SLOT(onClicked(Item*)));
-        team->setOpacity(0.0);
+//        team->setOpacity(0.0);
         team->setZValue(100.0);
         team->setBackgroundColor(Qt::darkGray);
         team->setTextColor(Qt::white);
@@ -454,12 +522,14 @@ bool GraphicsScene::load(QIODevice *device)
     return true;
 }
 
-void GraphicsScene::onSceneRectChanged(const QRectF &rect)
+void GraphicsScene::onSceneRectChanged(const QRectF &rr)
 {
-    if (d.sceneRectChangedBlocked || rect.isEmpty())
+    if (d.sceneRectChangedBlocked || rr.isEmpty())
         return;
 
-    d.showQuestionState->assignProperty(&d.proxy, "geometry", ::raisedGeometry(sceneRect()));
+    const QRectF rect = rr.adjusted(0, 100, 0, 0);
+
+    d.showQuestionState->assignProperty(&d.proxy, "geometry", ::raisedGeometry(rect));
 
     d.sceneRectChangedBlocked = true;
     const int cols = d.topics.size();
@@ -484,10 +554,7 @@ void GraphicsScene::onSceneRectChanged(const QRectF &rect)
 
     Q_ASSERT(!d.teams.isEmpty());
     enum { Margin = 2 };
-    QRectF r(0, 0, (raised.width() / d.teams.size()) - (d.teams.size() - 1 * Margin),
-             raised.height() / 2);
-    r.moveCenter(raised.center());
-    r.moveLeft(raised.left());
+    QRectF r(0, 0, (rr.width() / d.teams.size()) - Margin, rect.top());
     for (int i=0; i<d.teams.size(); ++i) {
         d.teams.at(i)->setGeometry(r);
         r.translate(r.width() + Margin, 0);
@@ -508,7 +575,6 @@ void GraphicsScene::keyPressEvent(QKeyEvent *e)
 {
     switch (e->key()) {
     case Qt::Key_Space:
-        qDebug("%s %d: emit spaceBarPressed();", __FILE__, __LINE__);
         emit spaceBarPressed();
         break;
     default:
@@ -517,6 +583,14 @@ void GraphicsScene::keyPressEvent(QKeyEvent *e)
     e->accept();
 }
 
+void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *e)
+{
+    qDebug("%s %d: void GraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent *e)", __FILE__, __LINE__);
+    emit mouseButtonPressed(e->scenePos(), e->button());
+    QGraphicsScene::mousePressEvent(e);
+}
+
+
 QRectF GraphicsScene::frameGeometry(Frame *frame) const
 {
     return ::itemGeometry(frame->row() + 1, frame->column(), 6, d.topics.size(), sceneRect());
@@ -524,7 +598,6 @@ QRectF GraphicsScene::frameGeometry(Frame *frame) const
 
 void GraphicsScene::click(Frame *frame)
 {
-    qDebug() << "clicking" << (frame != 0);
     if (!d.proxy.activeFrame()) {
         setupStateMachine(frame);
         emit showQuestion();
@@ -576,6 +649,12 @@ void GraphicsScene::clearActiveFrame()
     d.proxy.setActiveFrame(static_cast<Frame*>(0));
     emit normalState();
 }
+
+void GraphicsScene::onTransitionTriggered()
+{
+    qDebug() << sender()->objectName() << "triggered";
+}
+
 
 Frame::Frame(int row, int column)
     : Item()
