@@ -69,6 +69,7 @@ public:
     QRectF frameGeometry(Frame *frame) const;
     int answerTime() const;
     void setTeamGeometry(const QRectF &rect, Qt::Orientation orientation);
+    void setupFinishState();
 signals:
     void next(int type);
     void mouseButtonPressed(const QPointF &, Qt::MouseButton);

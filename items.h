@@ -93,7 +93,13 @@ public:
     void setPoints(int points) { d.points = points; updatePoints(); }
     void addPoints(int points) { d.points += points; updatePoints(); }
 private:
-    void updatePoints() { setText(QString("%1 $%2").arg(objectName()).arg(points())); }
+    void updatePoints()
+    {
+        setText(QString("%1 %2$%3").
+                arg(objectName()).
+                arg(points() < 0 ? QString('-') : QString()).
+                arg(qAbs(points())));
+    }
     struct Data {
         int points;
     } d;

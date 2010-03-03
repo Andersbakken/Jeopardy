@@ -113,24 +113,9 @@ GraphicsScene::GraphicsScene(QObject *parent)
         d.states[i] = state;
     }
 
-    QParallelAnimationGroup *proxyGroup = new QParallelAnimationGroup(this);
-    proxyGroup->addAnimation(new QPropertyAnimation(&d.proxy, "yRotation"));
-    proxyGroup->addAnimation(new QPropertyAnimation(&d.proxy, "geometry"));
-    proxyGroup->addAnimation(new QPropertyAnimation(&d.proxy, "backgroundColor"));
-    proxyGroup->addAnimation(new QPropertyAnimation(&d.proxy, "color"));
-
-    QParallelAnimationGroup *teamProxyGroup = new QParallelAnimationGroup(this);
-    teamProxyGroup->addAnimation(new QPropertyAnimation(d.teamProxy, "geometry"));
-
-    QParallelAnimationGroup *rightWrongOpacityGroup = new QParallelAnimationGroup(this);
-    rightWrongOpacityGroup->addAnimation(new QPropertyAnimation(d.rightAnswerItem, "opacity"));
-    rightWrongOpacityGroup->addAnimation(new QPropertyAnimation(d.wrongAnswerItem, "opacity"));
-
     addTransition(Normal, ShowQuestion);
-//    normalToShowQuestion->addAnimation(proxyGroup);
     addTransition(ShowQuestion, TimeOut);
     addTransition(ShowQuestion, PickTeam);
-//    showQuestionToPickTeam->addAnimation(teamProxyGroup);
     addTransition(TimeOut, Normal);
     addTransition(TimeOut, Finished);
     addTransition(PickTeam, NoAnswers);
@@ -215,6 +200,11 @@ GraphicsScene::GraphicsScene(QObject *parent)
         transition(RightAnswer, Normal)->addAnimation(sequentialReverse);
         transition(WrongAnswer, Normal)->addAnimation(sequentialReverse);
         transition(TimeOut, Normal)->addAnimation(sequentialReverse);
+
+        transition(TimeOut, Finished)->addAnimation(sequential);
+        transition(WrongAnswer, Finished)->addAnimation(sequential);
+        transition(RightAnswer, Finished)->addAnimation(sequential);
+        transition(NoAnswers, Finished)->addAnimation(sequential);
     }
 
     {
@@ -348,6 +338,7 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
 //         d.states[RightAnswer]->assignProperty(team, "color", Qt::white);
         d.states[Normal]->assignProperty(team, "backgroundColor", Qt::darkGray);
         d.states[Normal]->assignProperty(team, "color", Qt::white);
+        d.states[Finished]->assignProperty(team, "yRotation", 720.0);
         d.teams.append(team);
         addItem(team);
     }
@@ -648,11 +639,11 @@ void GraphicsScene::onStateEntered()
         d.currentFrame->setStatus(Frame::Succeeded);
         break;
     case Finished:
-        qSort(d.teams.end(), d.teams.begin(), compareTeamsByScore);
-        for (int i=0; i<d.teams.size(); ++i) {
-            qDebug() << i << d.teams.at(i)->points() << d.teams.at(i)->objectName();
-        }
-        qDebug() << "right" << d.right << "wrong" << d.wrong << "timedout" << d.timedout;
+//         qSort(d.teams.end(), d.teams.begin(), compareTeamsByScore);
+//         for (int i=0; i<d.teams.size(); ++i) {
+//             qDebug() << i << d.teams.at(i)->points() << d.teams.at(i)->objectName();
+//         }
+//         qDebug() << "right" << d.right << "wrong" << d.wrong << "timedout" << d.timedout;
         d.stateMachine.stop();
         break;
     case PickRightOrWrong:
@@ -699,6 +690,7 @@ void GraphicsScene::finishQuestion()
     d.currentFrame = 0;
     d.teamsAttempted.clear();
     if (--d.framesLeft == 0) {
+        setupFinishState();
         emit next(Finished);
     } else {
         emit next(Normal);
@@ -728,4 +720,26 @@ void State::addTransition(StateType type, Transition *transition)
 {
     d.transitions[type] = transition;
     QState::addTransition(transition);
+}
+
+
+void GraphicsScene::setupFinishState()
+{
+    qSort(d.teams.end(), d.teams.begin(), compareTeamsByScore);
+    QRectF rect(0, 0, sceneRect().width(), sceneRect().height() / d.teams.size());
+
+    const QString titles[] = { tr("Gold"), tr("Silver"), tr("Bronze") };
+
+    for (int i=0; i<d.teams.size(); ++i) {
+        d.states[Finished]->assignProperty(d.teams.at(i), "geometry", rect);
+        QString title;
+        if (i < 3) {
+            title = titles[i];
+        } else {
+            title = QString("%1.").arg(i + 1);
+        }
+        d.states[Finished]->assignProperty(d.teams.at(i), "text", QString("%1 - %2").arg(title, d.teams.at(i)->objectName()));
+        rect.translate(0, rect.height());
+    }
+//    qDebug() << "right" << d.right << "wrong" << d.wrong << "timedout" << d.timedout;
 }
