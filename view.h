@@ -2,12 +2,25 @@
 #define GRAPHICSVIEW_H
 
 #include <QtGui>
+class GraphicsView;
+class MainWindow : public QMainWindow
+{
+    Q_OBJECT
+public:
+    MainWindow();
+    void showEvent(QShowEvent *e);
+    void closeEvent(QCloseEvent *e);
+private:
+    struct Data {
+        GraphicsView *view;
+    } d;
+};
 class GraphicsScene;
 class GraphicsView : public QGraphicsView
 {
     Q_OBJECT
 public:
-    GraphicsView(QGraphicsScene *scene = 0, QWidget *parent = 0);
+    GraphicsView(QWidget *parent = 0);
     void resizeEvent(QResizeEvent *);
     QSize sizeHint() const;
     void load(const QString &fileName);

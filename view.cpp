@@ -1,8 +1,30 @@
 #include "view.h"
 #include "scene.h"
 
-GraphicsView::GraphicsView(QGraphicsScene *scene, QWidget *parent)
-    : QGraphicsView(scene, parent)
+MainWindow::MainWindow()
+    : QMainWindow()
+{
+    d.view = new GraphicsView(this);
+    setCentralWidget(d.view);
+    QMenu *menu = menuBar()->addMenu(tr("&File"));
+    menu->addActions(d.view->actions());
+}
+
+void MainWindow::showEvent(QShowEvent *e)
+{
+    restoreGeometry(QSettings().value("geometry").toByteArray());
+    QMainWindow::showEvent(e);
+}
+
+void MainWindow::closeEvent(QCloseEvent *e)
+{
+    QSettings().setValue("geometry", saveGeometry());
+    QMainWindow::closeEvent(e);
+}
+
+
+GraphicsView::GraphicsView(QWidget *parent)
+    : QGraphicsView(parent)
 {
     setContextMenuPolicy(Qt::ActionsContextMenu);
     setBackgroundBrush(Qt::red);
@@ -25,7 +47,7 @@ GraphicsView::GraphicsView(QGraphicsScene *scene, QWidget *parent)
 
     action = new QAction(tr("&Quit"), this);
     action->setShortcut(QKeySequence::Quit);
-    connect(action, SIGNAL(triggered(bool)), this, SLOT(close()));
+    connect(action, SIGNAL(triggered(bool)), qApp, SLOT(quit()));
     addAction(action);
 }
 
@@ -42,7 +64,7 @@ QSize GraphicsView::sizeHint() const
 
 void GraphicsView::newGame()
 {
-    QSettings settings("AndersSoft", "Jeopardy");
+    QSettings settings;
     const QString directory = settings.value("lastDirectory", QCoreApplication::applicationDirPath()).toString();
 
     const QString file = QFileDialog::getOpenFileName(this, "Choose game", directory, "*.jgm");
