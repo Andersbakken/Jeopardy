@@ -201,6 +201,32 @@ GraphicsScene::GraphicsScene(QObject *parent)
         transition(WrongAnswer, Normal)->addAnimation(sequentialReverse);
         transition(TimeOut, Normal)->addAnimation(sequentialReverse);
 
+    }
+
+    {
+        QSequentialAnimationGroup *sequential = new QSequentialAnimationGroup(&d.stateMachine);
+        QParallelAnimationGroup *parallel = new QParallelAnimationGroup;
+        QParallelAnimationGroup *parallel2 = new QParallelAnimationGroup;
+        sequential->addAnimation(parallel);
+        sequential->addAnimation(parallel2);
+        QPropertyAnimation *animation;
+        enum { Duration = 5000 };
+        for (int i=0; i<d.teams.size(); ++i) {
+            Team *team = d.teams.at(i);
+            if (team == d.cancelTeam)
+                continue;
+            parallel->addAnimation(animation = new QPropertyAnimation(team, "geometry"));
+            animation->setDuration(Duration);
+            parallel->addAnimation(animation = new QPropertyAnimation(team, "yRotation"));
+            animation->setDuration(Duration);
+            parallel2->addAnimation(animation = new TextAnimation(team, "text"));
+            animation->setDuration(Duration);
+            parallel2->addAnimation(animation = new QPropertyAnimation(team, "color"));
+            animation->setDuration(Duration);
+            parallel2->addAnimation(animation = new QPropertyAnimation(team, "backgroundColor"));
+            animation->setDuration(Duration);
+        }
+
         transition(TimeOut, Finished)->addAnimation(sequential);
         transition(WrongAnswer, Finished)->addAnimation(sequential);
         transition(RightAnswer, Finished)->addAnimation(sequential);
@@ -518,7 +544,6 @@ void GraphicsScene::clearActiveFrame()
 {
     Q_ASSERT(d.proxy.activeFrame());
     d.proxy.activeFrame()->setFlag(QGraphicsItem::ItemIsSelectable, false);
-    // ### add/remove score here
     d.proxy.setActiveFrame(static_cast<Frame*>(0));
     emit next(Normal);
 }
@@ -689,7 +714,7 @@ void GraphicsScene::finishQuestion()
     d.currentFrame->setAcceptHoverEvents(false);
     d.currentFrame = 0;
     d.teamsAttempted.clear();
-    if (--d.framesLeft == 0) {
+    if (!--d.framesLeft) {
         setupFinishState();
         emit next(Finished);
     } else {
@@ -733,6 +758,7 @@ void GraphicsScene::setupFinishState()
     QRectF rect(0, 0, sceneRect().width(), sceneRect().height() / count);
 
     const QString titles[] = { tr("Gold"), tr("Silver"), tr("Bronze") };
+    const QRgb colors[] = { 0xcd7f32, 0xe6e8fa, 0x8c7853, 0xb87333 };
 
     for (int i=0; i<count; ++i) {
         d.states[Finished]->assignProperty(teams.at(i), "geometry", rect);
@@ -745,6 +771,10 @@ void GraphicsScene::setupFinishState()
         d.states[Finished]->assignProperty(teams.at(i), "text", QString("%1 %2 %3").
                                            arg(title, teams.at(i)->objectName(),
                                                teams.at(i)->pointsString()));
+        const QColor color = colors[qMin(3, i)];
+        const QColor reversed(255 - color.red(), 255 - color.green(), 255 - color.blue());
+        d.states[Finished]->assignProperty(teams.at(i), "backgroundColor", color);
+        d.states[Finished]->assignProperty(teams.at(i), "color", reversed);
         rect.translate(0, rect.height());
     }
 //    qDebug() << "right" << d.right << "wrong" << d.wrong << "timedout" << d.timedout;
