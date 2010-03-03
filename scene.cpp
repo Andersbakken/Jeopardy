@@ -725,20 +725,26 @@ void State::addTransition(StateType type, Transition *transition)
 
 void GraphicsScene::setupFinishState()
 {
-    qSort(d.teams.end(), d.teams.begin(), compareTeamsByScore);
-    QRectF rect(0, 0, sceneRect().width(), sceneRect().height() / d.teams.size());
+    QList<Team*> teams = d.teams;
+    teams.removeOne(d.cancelTeam);
+    int count = teams.size();
+
+    qSort(teams.end(), teams.begin(), compareTeamsByScore);
+    QRectF rect(0, 0, sceneRect().width(), sceneRect().height() / count);
 
     const QString titles[] = { tr("Gold"), tr("Silver"), tr("Bronze") };
 
-    for (int i=0; i<d.teams.size(); ++i) {
-        d.states[Finished]->assignProperty(d.teams.at(i), "geometry", rect);
+    for (int i=0; i<count; ++i) {
+        d.states[Finished]->assignProperty(teams.at(i), "geometry", rect);
         QString title;
         if (i < 3) {
             title = titles[i];
         } else {
             title = QString("%1.").arg(i + 1);
         }
-        d.states[Finished]->assignProperty(d.teams.at(i), "text", QString("%1 - %2").arg(title, d.teams.at(i)->objectName()));
+        d.states[Finished]->assignProperty(teams.at(i), "text", QString("%1 %2 %3").
+                                           arg(title, teams.at(i)->objectName(),
+                                               teams.at(i)->pointsString()));
         rect.translate(0, rect.height());
     }
 //    qDebug() << "right" << d.right << "wrong" << d.wrong << "timedout" << d.timedout;

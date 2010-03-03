@@ -92,14 +92,10 @@ public:
     int points() const { return d.points; }
     void setPoints(int points) { d.points = points; updatePoints(); }
     void addPoints(int points) { d.points += points; updatePoints(); }
+
+    QString pointsString() const { return QString("%1$%2").arg(points() < 0 ? QString('-') : QString()).arg(qAbs(points())); }
 private:
-    void updatePoints()
-    {
-        setText(QString("%1 %2$%3").
-                arg(objectName()).
-                arg(points() < 0 ? QString('-') : QString()).
-                arg(qAbs(points())));
-    }
+    void updatePoints() { setText(QString("%1 %2").arg(objectName(), pointsString())); }
     struct Data {
         int points;
     } d;
