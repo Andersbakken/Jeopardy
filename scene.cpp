@@ -698,7 +698,7 @@ void GraphicsScene::finishQuestion()
     d.currentFrame->setAcceptHoverEvents(false);
     d.currentFrame = 0;
     d.teamsAttempted.clear();
-    if (d.framesLeft == 0) {
+    if (--d.framesLeft == 0) {
         emit next(Finished);
     } else {
         emit next(Normal);
