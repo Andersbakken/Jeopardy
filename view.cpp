@@ -67,7 +67,7 @@ void GraphicsView::newGame()
     QSettings settings;
     const QString directory = settings.value("lastDirectory", QCoreApplication::applicationDirPath()).toString();
 
-    const QString file = QFileDialog::getOpenFileName(this, "Choose game", directory, "*.jgm");
+    const QString file = QFileDialog::getOpenFileName(this, "Choose game", directory, "Games (*.jgm *.js)");
     if (QFile::exists(file)) {
         settings.setValue("lastDirectory", QFileInfo(file).absolutePath());
         load(file);

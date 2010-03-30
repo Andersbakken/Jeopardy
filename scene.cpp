@@ -1,4 +1,5 @@
 #include "scene.h"
+#include <QtScript>
 
 static inline QRectF itemGeometry(int row, int column, int rows, int columns, const QRectF &sceneRect)
 {
@@ -276,13 +277,17 @@ static QStringList pickTeams(QWidget *parent)
                 ret.append(text);
         }
     }
-    QSettings().setValue("lastTeams", ret);
+    if (!ret.isEmpty())
+        QSettings().setValue("lastTeams", ret);
     return ret;
 }
 
 bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
 {
     reset();
+    if (loadJavaScriptGame(device, tms)) {
+        return true;
+    }
     disconnect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(onSceneRectChanged(QRectF)));
     QTextStream ts(device);
     enum State {
@@ -779,4 +784,32 @@ void GraphicsScene::setupFinishState()
         rect.translate(0, rect.height());
     }
 //    qDebug() << "right" << d.right << "wrong" << d.wrong << "timedout" << d.timedout;
+}
+
+
+
+bool GraphicsScene::loadJavaScriptGame(QIODevice *device, const QStringList &teams)
+{
+    const QString program = QTextStream(device).readAll();
+    QScriptEngine engine;
+    engine.evaluate(program);
+    if (engine.hasUncaughtException())
+        return false;
+    QScriptValue array = engine.evaluate("init");
+    if (engine.hasUncaughtException() || !array.isArray())
+        return false;
+    int i = 0;
+    QStringList categories;
+    forever {
+        QScriptValue category = array.property(i++);
+        if (engine.hasUncaughtException() || category.isNull())
+            break;
+    }
+
+//     const QStringList categories = engine.evaluate("getCategories();").toVariant().toStringList();
+//     if (categories.isEmpty() || engine.hasUncaughtException())
+//         return false;
+//     qDebug() << categories;
+
+    return true;
 }

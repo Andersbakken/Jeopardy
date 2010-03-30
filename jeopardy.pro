@@ -21,3 +21,4 @@ unix {
     OBJECTS_DIR=tmp/obj
 }
 RESOURCES += jeopardy.qrc
+QT = script gui core
