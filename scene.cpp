@@ -316,57 +316,57 @@ void GraphicsScene::init(const QStringList &categories, const QList<QPair<QStrin
 bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
 {
     reset();
-    if (loadJavaScriptGame(device, tms)) {
-        return true;
-    }
-    device->seek(0);
     disconnect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(onSceneRectChanged(QRectF)));
-    QTextStream ts(device);
-    enum State {
-        ExpectingTopic,
-        ExpectingQuestion
-    } state = ExpectingTopic;
+
+    if (!loadJavaScriptGame(device)) {
+        device->seek(0);
+        QTextStream ts(device);
+        enum State {
+            ExpectingTopic,
+            ExpectingQuestion
+        } state = ExpectingTopic;
 
 //    TopicItem *topic = 0;
-    int lineNumber = 0;
-    QRegExp commentRegexp("^ *#");
-    QStringList categories;
-    QList<QPair<QString, QString> > frames;
+        int lineNumber = 0;
+        QRegExp commentRegexp("^ *#");
+        QStringList categories;
+        QList<QPair<QString, QString> > frames;
 
-    while (!ts.atEnd()) {
-        ++lineNumber;
-        const QString line = ts.readLine().simplified();
-        if (line.indexOf(commentRegexp) == 0)
-            continue;
-        switch (state) {
-        case ExpectingTopic:
-            if (line.isEmpty())
+        while (!ts.atEnd()) {
+            ++lineNumber;
+            const QString line = ts.readLine().simplified();
+            if (line.indexOf(commentRegexp) == 0)
                 continue;
-            categories.append(line);
-            state = ExpectingQuestion;
-            break;
-        case ExpectingQuestion:
-            if (line.isEmpty()) {
-                qWarning() << "Didn't expect an empty line here. I was looking question number"
-                           << (d.frames.size() % 5) << "for" << d.topics.last()->text() << "on line" << lineNumber;
-                reset();
-                return false;
-            } else {
-                const QStringList split = line.split('|');
-                if (split.size() > 2) {
-                    qWarning("I don't understand this line. There can only be one | per question line (%s) line: %d",
-                             qPrintable(line), lineNumber);
+            switch (state) {
+            case ExpectingTopic:
+                if (line.isEmpty())
+                    continue;
+                categories.append(line);
+                state = ExpectingQuestion;
+                break;
+            case ExpectingQuestion:
+                if (line.isEmpty()) {
+                    qWarning() << "Didn't expect an empty line here. I was looking question number"
+                               << (d.frames.size() % 5) << "for" << d.topics.last()->text() << "on line" << lineNumber;
                     reset();
                     return false;
+                } else {
+                    const QStringList split = line.split('|');
+                    if (split.size() > 2) {
+                        qWarning("I don't understand this line. There can only be one | per question line (%s) line: %d",
+                                 qPrintable(line), lineNumber);
+                        reset();
+                        return false;
+                    }
+                    frames.append(qMakePair(split.at(0), split.at(1)));
+                    if (frames.size() % 5 == 0)
+                        state = ExpectingTopic;
                 }
-                frames.append(qMakePair(split.at(0), split.at(1)));
-                if (frames.size() % 5 == 0)
-                    state = ExpectingTopic;
+                break;
             }
-            break;
         }
+        init(categories, frames);
     }
-    init(categories, frames);
 
     const QStringList teams = (tms.isEmpty() ? pickTeams(views().value(0)) : tms);
     if (teams.isEmpty()) {
@@ -405,7 +405,8 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
     d.teamProxy->setTeams(d.teams);
 
     onSceneRectChanged(sceneRect());
-    connect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(onSceneRectChanged(QRectF)));
+    disconnect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(onSceneRectChanged(QRectF)));
+
     d.framesLeft = d.frames.size();
     return true;
 }
@@ -800,25 +801,39 @@ void GraphicsScene::setupFinishState()
 //    qDebug() << "right" << d.right << "wrong" << d.wrong << "timedout" << d.timedout;
 }
 
-
-
-bool GraphicsScene::loadJavaScriptGame(QIODevice *device, const QStringList &teams)
+bool GraphicsScene::loadJavaScriptGame(QIODevice *device)
 {
     const QString program = QTextStream(device).readAll();
     QScriptEngine engine;
     engine.evaluate(program);
     if (engine.hasUncaughtException())
         return false;
-    QScriptValue array = engine.evaluate("init");
+    QScriptValue array = engine.evaluate("init()");
     if (engine.hasUncaughtException() || !array.isArray())
         return false;
     int i = 0;
     QStringList categories;
+    QList<QPair<QString, QString> > frames;
     forever {
-        QScriptValue category = array.property(i++);
+        const QScriptValue category = array.property(i++);
         if (engine.hasUncaughtException() || category.isNull())
-            break;
+            return false;
+        const QScriptValue topic = category.property("topic");
+        if (engine.hasUncaughtException() || topic.isNull())
+            return false;
+        const QScriptValue questions = category.property("questions");
+        if (engine.hasUncaughtException() || !questions.isArray() || questions.property("length").toInteger() != 5)
+            return false;
+        const QScriptValue answers = category.property("answers");
+        if (engine.hasUncaughtException() || !answers.isArray() || answers.property("length").toInteger() != 5)
+            return false;
+
+        for (int j=0; j<5; ++j) {
+            frames.append(qMakePair(questions.property(j).toString(), answers.property(j).toString()));
+        }
     }
+    init(categories, frames);
+
 
 //     const QStringList categories = engine.evaluate("getCategories();").toVariant().toStringList();
 //     if (categories.isEmpty() || engine.hasUncaughtException())

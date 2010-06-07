@@ -64,7 +64,7 @@ class GraphicsScene : public QGraphicsScene
 public:
     GraphicsScene(QObject *parent = 0);
     bool load(QIODevice *device, const QStringList &teams);
-    bool loadJavaScriptGame(QIODevice *device, const QStringList &teams);
+    bool loadJavaScriptGame(QIODevice *device);
     void reset();
     void mousePressEvent(QGraphicsSceneMouseEvent *e);
     QRectF frameGeometry(Frame *frame) const;
