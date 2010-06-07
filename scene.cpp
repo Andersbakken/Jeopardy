@@ -318,7 +318,12 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
     reset();
     disconnect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(onSceneRectChanged(QRectF)));
 
-    if (!loadJavaScriptGame(device)) {
+    switch (loadJavaScriptGame(device)) {
+    case Failure:
+        return false;
+    case Success:
+        break;
+    case NotJavascript: {
         device->seek(0);
         QTextStream ts(device);
         enum State {
@@ -352,7 +357,7 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
                     return false;
                 } else {
                     const QStringList split = line.split('|');
-                    if (split.size() > 2) {
+                    if (split.size() != 2) {
                         qWarning("I don't understand this line. There can only be one | per question line (%s) line: %d",
                                  qPrintable(line), lineNumber);
                         reset();
@@ -366,6 +371,7 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
             }
         }
         init(categories, frames);
+        break; }
     }
 
     const QStringList teams = (tms.isEmpty() ? pickTeams(views().value(0)) : tms);
@@ -801,38 +807,48 @@ void GraphicsScene::setupFinishState()
 //    qDebug() << "right" << d.right << "wrong" << d.wrong << "timedout" << d.timedout;
 }
 
-bool GraphicsScene::loadJavaScriptGame(QIODevice *device)
+#define TEST(op)                                                        \
+    if (engine.hasUncaughtException()) {                                \
+        qWarning("Exception %s at line %d\n",                           \
+                 qPrintable(engine.uncaughtException().toString()),     \
+                 engine.uncaughtExceptionLineNumber());                 \
+        return Failure;                                                  \
+    } else if (!(op)) {                                                 \
+        qWarning("%s failed", #op);                                     \
+        return Failure;                                                  \
+    }
+
+
+GraphicsScene::JavaScriptLoadState GraphicsScene::loadJavaScriptGame(QIODevice *device)
 {
     const QString program = QTextStream(device).readAll();
     QScriptEngine engine;
     engine.evaluate(program);
     if (engine.hasUncaughtException())
-        return false;
-    QScriptValue array = engine.evaluate("init()");
-    if (engine.hasUncaughtException() || !array.isArray())
-        return false;
-    int i = 0;
-    QStringList categories;
+        return NotJavascript;
+    TEST(true);
+    const QScriptValue categories = engine.evaluate("init()");
+    TEST(categories.isArray());
+    const int categoryCount = categories.property("length").toInteger();
+    TEST(categoryCount > 0);
+    QStringList topics;
     QList<QPair<QString, QString> > frames;
-    forever {
-        const QScriptValue category = array.property(i++);
-        if (engine.hasUncaughtException() || category.isNull())
-            return false;
-        const QScriptValue topic = category.property("topic");
-        if (engine.hasUncaughtException() || topic.isNull())
-            return false;
-        const QScriptValue questions = category.property("questions");
-        if (engine.hasUncaughtException() || !questions.isArray() || questions.property("length").toInteger() != 5)
-            return false;
-        const QScriptValue answers = category.property("answers");
-        if (engine.hasUncaughtException() || !answers.isArray() || answers.property("length").toInteger() != 5)
-            return false;
+    for (int i=0; i<categoryCount; ++i) {
+        const QScriptValue category = categories.property(i);
 
+        TEST(category.isObject());
+        const QScriptValue topic = category.property("topic");
+        TEST(!topic.isNull());
+        topics.append(topic.toString());
+        const QScriptValue questions = category.property("questions");
+        TEST(questions.isArray() && questions.property("length").toInteger() == 5);
+        const QScriptValue answers = category.property("answers");
+        TEST(answers.isArray() && answers.property("length").toInteger() == 5);
         for (int j=0; j<5; ++j) {
             frames.append(qMakePair(questions.property(j).toString(), answers.property(j).toString()));
         }
     }
-    init(categories, frames);
+    init(topics, frames);
 
 
 //     const QStringList categories = engine.evaluate("getCategories();").toVariant().toStringList();
@@ -840,5 +856,5 @@ bool GraphicsScene::loadJavaScriptGame(QIODevice *device)
 //         return false;
 //     qDebug() << categories;
 
-    return true;
+    return Success;
 }

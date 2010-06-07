@@ -64,7 +64,6 @@ class GraphicsScene : public QGraphicsScene
 public:
     GraphicsScene(QObject *parent = 0);
     bool load(QIODevice *device, const QStringList &teams);
-    bool loadJavaScriptGame(QIODevice *device);
     void reset();
     void mousePressEvent(QGraphicsSceneMouseEvent *e);
     QRectF frameGeometry(Frame *frame) const;
@@ -86,6 +85,13 @@ public slots:
     void onStateExited();
     void nextStateTimeOut() { emit next(TimeOut); }
 private:
+    enum JavaScriptLoadState {
+        Success,
+        Failure,
+        NotJavascript
+    };
+    JavaScriptLoadState loadJavaScriptGame(QIODevice *device);
+
     void init(const QStringList &categories, const QList<QPair<QString, QString> > &frames);
     Transition *transition(StateType from, StateType to) const;
     Transition *addTransition(StateType from, StateType to);
