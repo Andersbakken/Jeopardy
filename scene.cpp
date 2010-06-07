@@ -288,6 +288,7 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
     if (loadJavaScriptGame(device, tms)) {
         return true;
     }
+    device->seek(0);
     disconnect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(onSceneRectChanged(QRectF)));
     QTextStream ts(device);
     enum State {
@@ -302,8 +303,8 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
     Frame *frame = 0;
     while (!ts.atEnd()) {
         ++lineNumber;
-        QString line = ts.readLine();
-        line = line.simplified();
+        QString line = ts.readLine().simplified();
+        printf("%s", qPrintable(line));
         if (line.indexOf(commentRegexp) == 0)
             continue;
         switch (state) {
@@ -353,6 +354,7 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
             break;
         }
     }
+    printf("%d\n", d.frames.size());
 
     const QStringList teams = (tms.isEmpty() ? pickTeams(views().value(0)) : tms);
     if (teams.isEmpty()) {
