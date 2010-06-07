@@ -282,6 +282,37 @@ static QStringList pickTeams(QWidget *parent)
     return ret;
 }
 
+void GraphicsScene::init(const QStringList &categories, const QList<QPair<QString, QString> > &frames)
+{
+    const int count = categories.size();
+    Q_ASSERT(count * 5 == frames.size());
+    for (int i=0; i<count; ++i) {
+        Item *topic = new Item;
+        topic->setFlag(QGraphicsItem::ItemIsSelectable, false);
+        topic->setBackgroundColor(Qt::darkBlue);
+        topic->setColor(Qt::yellow);
+        topic->setText(categories[i]);
+        addItem(topic);
+        d.topics.append(topic);
+        for (int j=0; j<5; ++j) {
+            Frame *frame = new Frame(j, i);
+            connect(frame, SIGNAL(clicked(Item*, QPointF)), this, SLOT(onClicked(Item*)));
+            frame->setFlag(QGraphicsItem::ItemIsSelectable, true);
+            frame->setBackgroundColor(Qt::blue);
+            frame->setColor(Qt::white);
+            frame->setValue((j + 1) * 100);
+            const QPair<QString, QString> &data = frames.at((i * 5) + j);
+            frame->setQuestion(data.first);
+            frame->setAnswer(data.second);
+            frame->setText(frame->valueString());
+
+            addItem(frame);
+            d.frames.append(frame);
+        }
+    }
+}
+
+
 bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
 {
     reset();
@@ -299,25 +330,19 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
 //    TopicItem *topic = 0;
     int lineNumber = 0;
     QRegExp commentRegexp("^ *#");
-    Item *topic = 0;
-    Frame *frame = 0;
+    QStringList categories;
+    QList<QPair<QString, QString> > frames;
+
     while (!ts.atEnd()) {
         ++lineNumber;
-        QString line = ts.readLine().simplified();
-        printf("%s", qPrintable(line));
+        const QString line = ts.readLine().simplified();
         if (line.indexOf(commentRegexp) == 0)
             continue;
         switch (state) {
         case ExpectingTopic:
             if (line.isEmpty())
                 continue;
-            topic = new Item;
-            topic->setFlag(QGraphicsItem::ItemIsSelectable, false);
-            topic->setBackgroundColor(Qt::darkBlue);
-            topic->setColor(Qt::yellow);
-            topic->setText(line);
-            addItem(topic);
-            d.topics.append(topic);
+            categories.append(line);
             state = ExpectingQuestion;
             break;
         case ExpectingQuestion:
@@ -334,27 +359,14 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
                     reset();
                     return false;
                 }
-                const int row = d.frames.size() % 5;
-                const int col = d.topics.size() - 1;
-                frame = new Frame(row, col);
-                connect(frame, SIGNAL(clicked(Item*, QPointF)), this, SLOT(onClicked(Item*)));
-                frame->setFlag(QGraphicsItem::ItemIsSelectable, true);
-                frame->setBackgroundColor(Qt::blue);
-                frame->setColor(Qt::white);
-                frame->setValue((row + 1) * 100);
-                frame->setQuestion(split.value(0));
-                frame->setAnswer(split.value(1));
-                frame->setText(frame->valueString());
-
-                addItem(frame);
-                d.frames.append(frame);
-                if (row == 4)
+                frames.append(qMakePair(split.at(0), split.at(1)));
+                if (frames.size() % 5 == 0)
                     state = ExpectingTopic;
             }
             break;
         }
     }
-    printf("%d\n", d.frames.size());
+    init(categories, frames);
 
     const QStringList teams = (tms.isEmpty() ? pickTeams(views().value(0)) : tms);
     if (teams.isEmpty()) {

@@ -86,6 +86,7 @@ public slots:
     void onStateExited();
     void nextStateTimeOut() { emit next(TimeOut); }
 private:
+    void init(const QStringList &categories, const QList<QPair<QString, QString> > &frames);
     Transition *transition(StateType from, StateType to) const;
     Transition *addTransition(StateType from, StateType to);
 
