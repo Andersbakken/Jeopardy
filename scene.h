@@ -80,7 +80,6 @@ public slots:
     void onClicked(Item *item);
     void clearActiveFrame();
     void onSceneRectChanged(const QRectF &rect);
-    void onTransitionTriggered();
     void onStateEntered();
     void onStateExited();
     void nextStateTimeOut() { emit next(TimeOut); }

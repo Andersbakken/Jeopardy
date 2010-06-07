@@ -419,7 +419,6 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
 
 void GraphicsScene::onSceneRectChanged(const QRectF &rr)
 {
-    qDebug() << rr << d.sceneRectChangedBlocked;
     if (d.sceneRectChangedBlocked || rr.isEmpty())
         return;
 
@@ -576,11 +575,6 @@ void GraphicsScene::clearActiveFrame()
     emit next(Normal);
 }
 
-void GraphicsScene::onTransitionTriggered()
-{
-    qDebug() << sender()->objectName() << "triggered";
-}
-
 void GraphicsScene::setTeamGeometry(const QRectF &rect, Qt::Orientation orientation)
 {
     d.teamsGeometry = rect;
@@ -617,7 +611,7 @@ static inline bool compareTeamsByScore(const Team *left, const Team *right)
 void GraphicsScene::onStateEntered()
 {
     d.currentState = qobject_cast<State*>(sender());
-    qDebug() << d.currentState->objectName() << "entered" << QTime::currentTime().toString("mm:ss");
+//    qDebug() << d.currentState->objectName() << "entered" << QTime::currentTime().toString("mm:ss");
     const StateType type = d.currentState->type();
     switch (type) {
     case Normal:
@@ -733,7 +727,7 @@ void GraphicsScene::onStateExited()
     default:
         break;
     }
-    qDebug() << sender()->objectName() << "exited";
+//    qDebug() << sender()->objectName() << "exited";
 }
 
 
