@@ -22,6 +22,10 @@ void MainWindow::closeEvent(QCloseEvent *e)
     QMainWindow::closeEvent(e);
 }
 
+void MainWindow::load(const QString &file)
+{
+    d.view->load(file);
+}
 
 GraphicsView::GraphicsView(QWidget *parent)
     : QGraphicsView(parent)
@@ -342,3 +346,4 @@ void GraphicsView::load(const QString &fileName)
         delete scene;
     }
 }
+

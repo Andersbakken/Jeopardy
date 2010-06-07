@@ -10,6 +10,7 @@ public:
     MainWindow();
     void showEvent(QShowEvent *e);
     void closeEvent(QCloseEvent *e);
+    void load(const QString &file);
 private:
     struct Data {
         GraphicsView *view;
