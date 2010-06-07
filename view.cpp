@@ -22,9 +22,9 @@ void MainWindow::closeEvent(QCloseEvent *e)
     QMainWindow::closeEvent(e);
 }
 
-void MainWindow::load(const QString &file)
+void MainWindow::load(const QString &string)
 {
-    d.view->load(file);
+    d.view->load(string);
 }
 
 GraphicsView::GraphicsView(QWidget *parent)
@@ -57,6 +57,7 @@ GraphicsView::GraphicsView(QWidget *parent)
 
 void GraphicsView::resizeEvent(QResizeEvent *e)
 {
+    qDebug() << "resizeEvent" << rect();
     QGraphicsView::resizeEvent(e);
     if (scene())
         scene()->setSceneRect(rect());
@@ -340,8 +341,8 @@ void GraphicsView::load(const QString &fileName)
         setBackgroundBrush(QBrush());
         delete d.scene;
         d.scene = scene;
-        setScene(scene);
         d.scene->setSceneRect(rect());
+        setScene(scene);
     } else {
         delete scene;
     }

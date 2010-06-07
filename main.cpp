@@ -9,8 +9,8 @@ int main(int argc, char **argv)
     a.setApplicationName(QLatin1String("Jeopardy"));
 
     MainWindow w;
-    w.show();
     if (argc > 1)
-        w.load(QString::fromLatin1(argv[1]));
+        QMetaObject::invokeMethod(&w, "load", Qt::QueuedConnection, Q_ARG(QString, QString::fromLocal8Bit(argv[1])));
+    w.show();
     return a.exec();
 }

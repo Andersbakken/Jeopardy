@@ -411,7 +411,7 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
     d.teamProxy->setTeams(d.teams);
 
     onSceneRectChanged(sceneRect());
-    disconnect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(onSceneRectChanged(QRectF)));
+    connect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(onSceneRectChanged(QRectF)));
 
     d.framesLeft = d.frames.size();
     return true;
@@ -419,6 +419,7 @@ bool GraphicsScene::load(QIODevice *device, const QStringList &tms)
 
 void GraphicsScene::onSceneRectChanged(const QRectF &rr)
 {
+    qDebug() << rr << d.sceneRectChangedBlocked;
     if (d.sceneRectChangedBlocked || rr.isEmpty())
         return;
 
