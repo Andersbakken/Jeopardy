@@ -57,7 +57,6 @@ GraphicsView::GraphicsView(QWidget *parent)
 
 void GraphicsView::resizeEvent(QResizeEvent *e)
 {
-    qDebug() << "resizeEvent" << rect();
     QGraphicsView::resizeEvent(e);
     if (scene())
         scene()->setSceneRect(rect());
