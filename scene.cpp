@@ -176,7 +176,7 @@ GraphicsScene::GraphicsScene(QObject *parent)
         QSequentialAnimationGroup *sequential = new QSequentialAnimationGroup(&d.stateMachine);
         QParallelAnimationGroup *parallel = new QParallelAnimationGroup;
         QPropertyAnimation *animation;
-        enum { Duration = 750 };
+        enum { Duration = 1000 };
         parallel->addAnimation(animation = new QPropertyAnimation(&d.proxy, "geometry"));
         animation->setDuration(Duration);
         parallel->addAnimation(animation = new QPropertyAnimation(&d.proxy, "yRotation"));
@@ -237,7 +237,7 @@ GraphicsScene::GraphicsScene(QObject *parent)
     {
         QParallelAnimationGroup *teamAnimation = new QParallelAnimationGroup(&d.stateMachine);
         QPropertyAnimation *animation;
-        enum { Duration = 250 };
+        enum { Duration = 1000 };
         teamAnimation->addAnimation(animation = new QPropertyAnimation(d.teamProxy, "geometry"));
         animation->setDuration(Duration);
         transition(ShowQuestion, PickTeam)->addAnimation(teamAnimation);
