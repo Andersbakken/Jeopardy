@@ -71,6 +71,9 @@ public:
     QString answer() const { return d.answer; }
     void setAnswer(const QString &answer) { d.answer = answer; }
 
+#ifdef QT_DEBUG
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = 0);
+#endif
 private:
     struct Data {
         QString question, answer, valueString;

@@ -202,3 +202,21 @@ QVariant Item::itemChange(GraphicsItemChange change, const QVariant &value)
     }
     return QGraphicsWidget::itemChange(change, value);
 }
+
+#ifdef QT_DEBUG
+void Frame::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
+{
+    Item::paint(painter, option, widget);
+    static const bool showAll = QCoreApplication::arguments().contains("--show-all");
+    if (showAll) {
+        painter->save();
+        const QRect rect = option->rect.adjusted(10, 10, -10, -10);
+        QFont font;
+        font.setPixelSize(15);
+        painter->setFont(font);
+        painter->drawText(rect, Qt::AlignLeft|Qt::AlignTop, d.question);
+        painter->drawText(rect, Qt::AlignLeft|Qt::AlignBottom, d.answer);
+        painter->restore();
+    }
+}
+#endif

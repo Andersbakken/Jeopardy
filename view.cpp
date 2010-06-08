@@ -22,9 +22,9 @@ void MainWindow::closeEvent(QCloseEvent *e)
     QMainWindow::closeEvent(e);
 }
 
-void MainWindow::load(const QString &string)
+void MainWindow::load(const QString &string, const QStringList &players)
 {
-    d.view->load(string);
+    d.view->load(string, players);
 }
 
 GraphicsView::GraphicsView(QWidget *parent)
@@ -333,10 +333,10 @@ void GraphicsView::createGame()
     }
 }
 
-void GraphicsView::load(const QString &fileName)
+void GraphicsView::load(const QString &fileName, const QStringList &players)
 {
     GraphicsScene *scene = new GraphicsScene(this);
-    if (scene->load(fileName)) {
+    if (scene->load(fileName, players)) {
         setBackgroundBrush(QBrush());
         delete d.scene;
         d.scene = scene;

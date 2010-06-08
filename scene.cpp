@@ -802,15 +802,46 @@ void GraphicsScene::setupFinishState()
 //    qDebug() << "right" << d.right << "wrong" << d.wrong << "timedout" << d.timedout;
 }
 
+QScriptValue random(QScriptContext *ctx, QScriptEngine *)
+{
+    switch (ctx->argumentCount()) {
+    case 1:
+        if (!ctx->argument(0).isNumber()) {
+            ctx->throwError("Invalid argument");
+            return QScriptValue();
+        }
+        qDebug() << ctx->argument(0).toInt32();
+        return (rand() % ctx->argument(0).toInt32());
+    default:
+        ctx->throwError("Invalid amount of arguments to rand(). Need 1 or 2");
+        return QScriptValue();
+    case 2:
+        break;
+    }
+    if (!ctx->argument(0).isNumber() || !ctx->argument(1).isNumber()) {
+        ctx->throwError("Invalid arguments");
+        return QScriptValue();
+    }
+
+    const int from = ctx->argument(0).toInt32();
+    const int to = ctx->argument(1).toInt32();
+    if (from >= to) {
+        ctx->throwError("Invalid arguments");
+        return QScriptValue();
+    }
+
+    return (rand() % (to - from) + from);
+}
+
 #define TEST(op)                                                        \
     if (engine.hasUncaughtException()) {                                \
         qWarning("Exception %s at line %d\n",                           \
                  qPrintable(engine.uncaughtException().toString()),     \
                  engine.uncaughtExceptionLineNumber());                 \
-        return Failure;                                                  \
+        return Failure;                                                 \
     } else if (!(op)) {                                                 \
         qWarning("%s failed", #op);                                     \
-        return Failure;                                                  \
+        return Failure;                                                 \
     }
 
 
@@ -818,13 +849,16 @@ GraphicsScene::JavaScriptLoadState GraphicsScene::loadJavaScriptGame(QIODevice *
 {
     const QString program = QTextStream(device).readAll();
     QScriptEngine engine;
+    QScriptValue func = engine.newFunction(random);
+    engine.globalObject().setProperty("rand", func);
     engine.evaluate(program);
-    if (engine.hasUncaughtException())
+    if (engine.hasUncaughtException()) {
+        qDebug() << engine.uncaughtException().toString() << engine.uncaughtExceptionLineNumber();
         return NotJavascript;
-    TEST(true);
+    }
     const QScriptValue categories = engine.evaluate("init()");
     TEST(categories.isArray());
-    const int categoryCount = categories.property("length").toInteger();
+    const int categoryCount = categories.property("length").toInt32();
     TEST(categoryCount > 0);
     QStringList topics;
     QList<QPair<QString, QString> > frames;
@@ -836,9 +870,9 @@ GraphicsScene::JavaScriptLoadState GraphicsScene::loadJavaScriptGame(QIODevice *
         TEST(!topic.isNull());
         topics.append(topic.toString());
         const QScriptValue questions = category.property("questions");
-        TEST(questions.isArray() && questions.property("length").toInteger() == 5);
+        TEST(questions.isArray() && questions.property("length").toInt32() == 5);
         const QScriptValue answers = category.property("answers");
-        TEST(answers.isArray() && answers.property("length").toInteger() == 5);
+        TEST(answers.isArray() && answers.property("length").toInt32() == 5);
         for (int j=0; j<5; ++j) {
             frames.append(qMakePair(questions.property(j).toString(), answers.property(j).toString()));
         }

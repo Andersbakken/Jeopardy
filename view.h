@@ -11,7 +11,7 @@ public:
     void showEvent(QShowEvent *e);
     void closeEvent(QCloseEvent *e);
 public slots:
-    void load(const QString &file);
+    void load(const QString &file, const QStringList &players);
 private:
     struct Data {
         GraphicsView *view;
@@ -25,7 +25,7 @@ public:
     GraphicsView(QWidget *parent = 0);
     void resizeEvent(QResizeEvent *);
     QSize sizeHint() const;
-    void load(const QString &fileName);
+    void load(const QString &file, const QStringList &players = QStringList());
 public slots:
     void newGame();
     void createGame();
