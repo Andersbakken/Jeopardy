@@ -4,6 +4,7 @@
 int main(int argc, char **argv)
 {
     srand(QDateTime::currentDateTime().toMSecsSinceEpoch());
+
     QApplication a(argc, argv);
     a.setOrganizationName(QLatin1String("AndersSoft"));
     a.setOrganizationDomain(QLatin1String("www.anderssoft.com"));

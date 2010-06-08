@@ -14,6 +14,7 @@ void MainWindow::showEvent(QShowEvent *e)
 {
     restoreGeometry(QSettings().value("geometry").toByteArray());
     QMainWindow::showEvent(e);
+    raise();
 }
 
 void MainWindow::closeEvent(QCloseEvent *e)
@@ -51,7 +52,7 @@ GraphicsView::GraphicsView(QWidget *parent)
 
     action = new QAction(tr("&Quit"), this);
     action->setShortcut(QKeySequence::Quit);
-    connect(action, SIGNAL(triggered(bool)), qApp, SLOT(quit()));
+    connect(action, SIGNAL(triggered(bool)), QCoreApplication::instance(), SLOT(quit()));
     addAction(action);
 }
 

@@ -22,3 +22,4 @@ unix {
 }
 RESOURCES += jeopardy.qrc
 QT = script gui core
+CONFIG -= app_bundle

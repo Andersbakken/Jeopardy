@@ -1,7 +1,7 @@
 function multiply1(factor1, factor2)
 {
     var ret = new Object;
-    ret.question = factor1 + " * " + factor2;
+    ret.question = factor1 + " * " + factor2 + " = ?";
     ret.answer = factor1 * factor2;
     return ret;
 }
@@ -13,6 +13,15 @@ function multiply2(factor1, factor2)
     ret.answer = factor2;
     return ret;
 }
+
+function division1(factor1, factor2)
+{
+    var ret = new Object;
+    ret.question = (factor1 * factor2) + " / " + factor2 + " = ?";
+    ret.answer = factor1;
+    return ret;
+}
+
 
 //function num(from, to)
 //{
@@ -56,7 +65,6 @@ function mult5(idx)
     return (idx + 1) * 5;
 }
 
-
 function init()
 {
     var categories = new Array;
@@ -75,24 +83,14 @@ function init()
     category = frames(2, 10, 10, mult20, multiply2);
     category.topic = "Multiplication 3";
     categories[categories.length] = category;
-    return categories;
 
-    // categories[0] = new Object;
+    category = frames(2, 10, 2, 10, division1);
+    category.topic = "Division 1";
+    categories[categories.length] = category;
 
-    for (var i=0; i<6; ++i) {
-	var category = new Object;
-        var randomnumber=Math.floor(Math.random() * 11);
-	category["topic"] = randomnumber;
-	var questions = new Array;
-	var answers = new Array;
-        for (var j=0; j<5; ++j) {
-	    var val = (j + 1) * (i + 1);
-	    questions[j] = val + ' * ' + val;
-	    answers[j] = val * val;
-	}
-	category["questions"] = questions;
-	category["answers"] = answers;
-        categories[i] = category;
-    }
+    category = frames(2, 10, 2, mult5, division1);
+    category.topic = "Division 2";
+    categories[categories.length] = category;
+
     return categories;
 }
