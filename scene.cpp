@@ -802,7 +802,7 @@ void GraphicsScene::setupFinishState()
 //    qDebug() << "right" << d.right << "wrong" << d.wrong << "timedout" << d.timedout;
 }
 
-QScriptValue random(QScriptContext *ctx, QScriptEngine *)
+static inline QScriptValue random(QScriptContext *ctx, QScriptEngine *)
 {
     switch (ctx->argumentCount()) {
     case 1:
@@ -810,8 +810,7 @@ QScriptValue random(QScriptContext *ctx, QScriptEngine *)
             ctx->throwError("Invalid argument");
             return QScriptValue();
         }
-        qDebug() << ctx->argument(0).toInt32();
-        return (rand() % ctx->argument(0).toInt32());
+        return (rand() % ctx->argument(0).toInt32()) + 1;
     default:
         ctx->throwError("Invalid amount of arguments to rand(). Need 1 or 2");
         return QScriptValue();
@@ -830,7 +829,7 @@ QScriptValue random(QScriptContext *ctx, QScriptEngine *)
         return QScriptValue();
     }
 
-    return (rand() % (to - from) + from);
+    return (rand() % (to - from) + from) + 1;
 }
 
 #define TEST(op)                                                        \

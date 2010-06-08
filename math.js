@@ -14,21 +14,13 @@ function multiply2(factor1, factor2)
     return ret;
 }
 
-function division1(factor1, factor2)
+function division(factor1, factor2)
 {
     var ret = new Object;
     ret.question = (factor1 * factor2) + " / " + factor2 + " = ?";
     ret.answer = factor1;
     return ret;
 }
-
-
-//function num(from, to)
-//{
-    //var ret = Math.floor(rand() * (to - from)) + from;
-    //print(ret, from, to);
-    //return ret;
-//}
 
 function extract(funcOrNumber, index)
 {
@@ -84,11 +76,11 @@ function init()
     category.topic = "Multiplication 3";
     categories[categories.length] = category;
 
-    category = frames(2, 10, 2, 10, division1);
+    category = frames(2, 10, 2, 10, division);
     category.topic = "Division 1";
     categories[categories.length] = category;
 
-    category = frames(2, 10, 2, mult5, division1);
+    category = frames(2, 10, 2, mult5, division);
     category.topic = "Division 2";
     categories[categories.length] = category;
 
