@@ -12,9 +12,9 @@ MainWindow::MainWindow()
 
 void MainWindow::showEvent(QShowEvent *e)
 {
-    restoreGeometry(QSettings().value("geometry").toByteArray());
     QMainWindow::showEvent(e);
     raise();
+    restoreGeometry(QSettings().value("geometry").toByteArray());
 }
 
 void MainWindow::closeEvent(QCloseEvent *e)
@@ -52,7 +52,7 @@ GraphicsView::GraphicsView(QWidget *parent)
 
     action = new QAction(tr("&Quit"), this);
     action->setShortcut(QKeySequence::Quit);
-    connect(action, SIGNAL(triggered(bool)), QCoreApplication::instance(), SLOT(quit()));
+    connect(action, SIGNAL(triggered(bool)), window(), SLOT(close()));
     addAction(action);
 }
 
@@ -88,6 +88,10 @@ public:
         setEnabled(false);
         setTabChangesFocus(true);
         connect(this, SIGNAL(textChanged()), this, SLOT(onTextChanged()));
+    }
+    QSize sizeHint() const
+    {
+        return QSize(100, 20);
     }
 
     void keyPressEvent(QKeyEvent *e)
@@ -150,6 +154,8 @@ public:
     {
         d.play = false;
         QGridLayout *layout = new QGridLayout(this);
+        layout->setMargin(0);
+        layout->setSpacing(0);
         QLabel *lbl = new QLabel(tr("&Name"));
         layout->addWidget(lbl, 0, 0);
         d.name = new QLineEdit;
@@ -163,6 +169,7 @@ public:
             } else {
                 layout->addWidget(new QLabel(QString("$%1").arg(i * 100)), (i + 1) * 2, 0, 2, 1);
             }
+            const int maxHeight = QApplication::desktop()->availableGeometry(this).height() / 7;
             for (int j=0; j<Columns; ++j) {
                 if (i == 0) {
                     QLineEdit *edit = new QLineEdit;
@@ -172,6 +179,7 @@ public:
                     layout->addWidget(edit, i + 1, j + 1);
                 } else {
                     TextEdit *edit = new TextEdit;
+                    edit->setMaximumHeight(maxHeight);
                     static const QLatin1String questionName("Question");
                     edit->setObjectName(questionName);
                     d.edits[j][i - 1][Question] = edit;
@@ -233,7 +241,6 @@ public:
         if (d.play) {
             d.file = name;
         }
-        qDebug() << d.file;
         QDialog::accept();
     }
 
